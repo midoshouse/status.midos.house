@@ -73,19 +73,32 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                     p : "Mido's House is up to date.";
                 } else {
                     p : "Pending updates:";
-                    ul {
-                        @for (commit_hash, status) in future {
-                            li {
-                                code {
-                                    a(href = format!("https://github.com/midoshouse/midos.house/commit/{commit_hash}")) : commit_hash.to_hex_with_len(7).to_string();
-                                }
-                                : ": ";
-                                @match status {
-                                    CommitStatus::Pending => : "waiting for other builds to finish";
-                                    CommitStatus::Skipped => : "skipped";
-                                    CommitStatus::Build => : "building";
-                                    CommitStatus::PrepareStop => : "waiting for ongoing races to stop";
-                                    CommitStatus::Deploy => : "deploying";
+                    table {
+                        thead {
+                            tr {
+                                th : "Commit";
+                                th : "Summary";
+                                th : "Status";
+                            }
+                        }
+                        tbody {
+                            @for (commit_hash, commit_msg, status) in future {
+                                tr {
+                                    td {
+                                        code {
+                                            a(href = format!("https://github.com/midoshouse/midos.house/commit/{commit_hash}")) : commit_hash.to_hex_with_len(7).to_string();
+                                        }
+                                    }
+                                    td : commit_msg;
+                                    td {
+                                        @match status {
+                                            CommitStatus::Pending => : "waiting for other builds to finish";
+                                            CommitStatus::Skipped => : "skipped";
+                                            CommitStatus::Build => : "building";
+                                            CommitStatus::PrepareStop => : "waiting for ongoing races to stop";
+                                            CommitStatus::Deploy => : "deploying";
+                                        }
+                                    }
                                 }
                             }
                         }

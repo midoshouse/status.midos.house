@@ -33,7 +33,7 @@ const SELF_REPO_PATH: &str = "/opt/git/github.com/midoshouse/status.midos.house/
 
 pub(crate) struct Status {
     pub(crate) running: gix::ObjectId,
-    pub(crate) future: Vec<(gix::ObjectId, CommitStatus)>,
+    pub(crate) future: Vec<(gix::ObjectId, String, CommitStatus)>,
 }
 
 pub(crate) enum CommitStatus {
@@ -61,6 +61,7 @@ pub(crate) enum NewError {
 
 #[derive(Debug, thiserror::Error, rocket_util::Error)]
 pub(crate) enum RefreshError {
+    #[error(transparent)] GitDecode(#[from] gix::diff::object::decode::Error),
     #[error(transparent)] GitFind(#[from] gix::object::find::existing::Error),
     #[error(transparent)] GitFindWithConversion(#[from] gix::object::find::existing::with_conversion::Error),
     #[error(transparent)] GitFindReference(#[from] gix::reference::find::existing::Error),
@@ -100,8 +101,8 @@ impl Supervisor {
     }
 
     pub(crate) async fn refresh(&self, rate_limit: bool, block: bool) -> Result<(), RefreshError> {
-        println!("refresh: waiting for build repo lock");
         let mut last_refresh = if block {
+            println!("refresh: waiting for build repo lock");
             self.build_repo_lock.0.lock().await
         } else {
             if let Ok(last_refresh) = self.build_repo_lock.0.try_lock() {
@@ -117,20 +118,20 @@ impl Supervisor {
             let repo = gix::open(BUILD_REPO_PATH)?;
             let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
             let needs_update = lock!(@write status = self.status; {
-                let status_latest = status.future.last().map_or(status.running, |(latest, _)| *latest);
+                let status_latest = status.future.last().map_or(status.running, |(latest, _, _)| *latest);
                 if new_head != status_latest {
-                    let mut to_add = vec![new_head];
                     let mut iter_commit = repo.find_commit(new_head)?;
+                    let mut to_add = vec![(new_head, iter_commit.message()?.summary().to_string())];
                     loop {
                         let Ok(parent) = iter_commit.parent_ids().exactly_one() else {
                             // initial commit or merge commit; skip parents for simplicity's sake
                             break
                         };
                         if parent == status_latest { break }
-                        to_add.push(parent.detach());
                         iter_commit = parent.object()?.peel_to_commit()?;
+                        to_add.push((parent.detach(), iter_commit.message()?.summary().to_string()));
                     }
-                    status.future.extend(to_add.into_iter().rev().map(|commit_hash| (commit_hash, CommitStatus::Pending)));
+                    status.future.extend(to_add.into_iter().rev().map(|(commit_hash, commit_msg)| (commit_hash, commit_msg, CommitStatus::Pending)));
                     println!("refresh: updating from {status_latest} to {new_head}");
                     true
                 } else {
@@ -145,8 +146,8 @@ impl Supervisor {
             println!("refresh: rate limited");
         }
         drop(last_refresh);
-        println!("refresh: waiting for self repo lock");
         let mut last_refresh = if block {
+            println!("refresh: waiting for self repo lock");
             self.self_repo_lock.0.lock().await
         } else {
             if let Ok(last_refresh) = self.self_repo_lock.0.try_lock() {
@@ -203,10 +204,10 @@ impl Supervisor {
                         Command::new("git").arg("pull").current_dir(BUILD_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
                         let new_head = gix::open(BUILD_REPO_PATH)?.head_commit()?.id;
                         if new_head != old_head {
-                            lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _)| *iter_commit == new_head) {
-                                status.future[idx].1 = CommitStatus::Build;
+                            lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                status.future[idx].2 = CommitStatus::Build;
                                 for idx in 0..idx {
-                                    status.future[idx].1 = CommitStatus::Skipped;
+                                    status.future[idx].2 = CommitStatus::Skipped;
                                 }
                             });
                             //TODO rustup
@@ -221,16 +222,16 @@ impl Supervisor {
                     if let Some(new_head) = needs_update {
                         println!("supervisor: updating to {new_head}");
                         if Command::new("/usr/bin/systemctl").arg("is-active").arg("midos-house").status().await.at_command("systemctl is-active")?.success() {
-                            lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _)| *iter_commit == new_head) {
-                                status.future[idx].1 = CommitStatus::PrepareStop;
+                            lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                status.future[idx].2 = CommitStatus::PrepareStop;
                             });
                             // intentionally not checking exit status as prepare-stop crashing is also a good reason to restart Mido's House
                             //TODO allow building newer commits during prepare-stop
                             println!("supervisor: preparing to stop");
                             Command::new(BIN_PATH).arg("prepare-stop").status().await.at_command("midos-house prepare-stop")?;
                         }
-                        lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _)| *iter_commit == new_head) {
-                            status.future[idx].1 = CommitStatus::Deploy;
+                        lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                            status.future[idx].2 = CommitStatus::Deploy;
                         });
                         println!("supervisor: stopping old version");
                         Command::new("sudo").arg("/usr/bin/systemctl").arg("stop").arg("midos-house").check("systemctl stop").await?;
@@ -244,7 +245,7 @@ impl Supervisor {
                         println!("supervisor: update completed");
                         lock!(@write status = self.status; {
                             status.running = new_head;
-                            if let Some(idx) = status.future.iter().position(|(iter_commit, _)| *iter_commit == new_head) {
+                            if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                                 status.future.drain(..idx);
                             }
                         });
