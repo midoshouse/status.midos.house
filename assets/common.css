@@ -1,0 +1,58 @@
+body {
+    font-family: system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+a {
+    color: inherit;
+}
+
+a:hover,
+.favicon {
+    text-decoration: none;
+}
+
+table {
+    margin: 8px;
+}
+
+tbody > tr:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+table,
+table th,
+table td {
+    border: 1px solid black;
+    border-spacing: 0;
+    text-align: center;
+    border-collapse: collapse;
+}
+
+table th,
+table td {
+    padding: 4px;
+}
+
+@media (min-width: 768px) {
+    table th,
+    table td {
+        padding: 8px;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: black;
+        color: white;
+    }
+
+    tbody > tr:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    table,
+    table th,
+    table td {
+        border-color: white;
+    }
+}
