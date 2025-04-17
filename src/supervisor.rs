@@ -82,6 +82,7 @@ pub(crate) enum RunError {
 impl Supervisor {
     pub(crate) fn new() -> Result<Self, NewError> {
         let running = gix::open(LIVE_REPO_PATH)?.head_commit()?.id;
+        println!("initial running commit: {running}");
         Ok(Self {
             build_repo_lock: Arc::new(Mutex::new(Instant::now())),
             update: watch::Sender::new(running),
@@ -93,9 +94,11 @@ impl Supervisor {
     }
 
     pub(crate) async fn refresh(&self, rate_limit: bool) -> Result<(), RefreshError> {
+        println!("refresh: waiting for build repo lock");
         lock!(last_refresh = self.build_repo_lock; {
             if !rate_limit || last_refresh.elapsed() >= Duration::from_secs(60) {
                 *last_refresh = Instant::now();
+                println!("refresh: fetching");
                 Command::new("git").arg("fetch").current_dir(BUILD_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
                 let repo = gix::open(BUILD_REPO_PATH)?;
                 let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
@@ -114,14 +117,18 @@ impl Supervisor {
                             iter_commit = parent.object()?.peel_to_commit()?;
                         }
                         status.future.extend(to_add.into_iter().rev().map(|commit_hash| (commit_hash, CommitStatus::Pending)));
+                        println!("refresh: updating from {status_latest} to {new_head}");
                         true
                     } else {
+                        println!("refresh: already up to date at {status_latest}");
                         false
                     }
                 });
                 if needs_update {
                     self.update.send_replace(new_head);
                 }
+            } else {
+                println!("refresh: rate limited");
             }
         });
         Ok(())
@@ -132,16 +139,25 @@ impl Supervisor {
     }
 
     pub(crate) async fn run(self, mut shutdown: rocket::Shutdown) -> Result<(), RunError> {
+        println!("supervisor: initializing");
         let user_dirs = UserDirs::new().ok_or(RunError::UserDirs)?;
         let next_path = user_dirs.home_dir().join("bin").join("midos-house-next");
         let mut update = self.update.subscribe();
         self.refresh(false).await?;
         update.mark_changed();
         loop {
+            println!("supervisor: waiting for events");
             select! {
-                () = &mut shutdown => break,
-                () = sleep(Duration::from_secs(24 * 60 * 60)) => self.refresh(true).await?,
+                () = &mut shutdown => {
+                    println!("supervisor: shutdown requested by rocket");
+                    break
+                }
+                () = sleep(Duration::from_secs(24 * 60 * 60)) => {
+                    println!("supervisor: no events after 1 hour, requesting refresh");
+                    self.refresh(true).await?;
+                }
                 res = update.changed() => {
+                    println!("supervisor: got update notification");
                     let () = res.expect("all update senders dropped");
                     let needs_update = lock!(last_refresh = self.build_repo_lock; {
                         let old_head = gix::open(BUILD_REPO_PATH)?.head_commit()?.id;
@@ -163,28 +179,37 @@ impl Supervisor {
                         }
                     });
                     if let Some(new_head) = needs_update {
+                        println!("supervisor: updating to {new_head}");
                         if Command::new("/usr/bin/systemctl").arg("is-active").arg("midos-house").status().await.at_command("systemctl is-active")?.success() {
                             lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _)| *iter_commit == new_head) {
                                 status.future[idx].1 = CommitStatus::PrepareStop;
                             });
                             // intentionally not checking exit status as prepare-stop crashing is also a good reason to restart Mido's House
                             //TODO allow building newer commits during prepare-stop
+                            println!("supervisor: preparing to stop");
                             Command::new(BIN_PATH).arg("prepare-stop").status().await.at_command("midos-house prepare-stop")?;
                         }
                         lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _)| *iter_commit == new_head) {
                             status.future[idx].1 = CommitStatus::Deploy;
                         });
+                        println!("supervisor: stopping old version");
                         Command::new("sudo").arg("/usr/bin/systemctl").arg("stop").arg("midos-house").check("systemctl stop").await?;
+                        println!("supervisor: pulling git repo");
                         Command::new("git").arg("pull").current_dir(LIVE_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
+                        println!("supervisor: replacing binary");
                         Command::new("chmod").arg("+x").arg(&next_path).check("chmod").await?;
                         fs::rename(&next_path, BIN_PATH).await?;
+                        println!("supervisor: starting new version");
                         Command::new("sudo").arg("/usr/bin/systemctl").arg("start").arg("midos-house").check("systemctl start").await?;
+                        println!("supervisor: update completed");
                         lock!(@write status = self.status; {
                             status.running = new_head;
                             if let Some(idx) = status.future.iter().position(|(iter_commit, _)| *iter_commit == new_head) {
                                 status.future.drain(..idx);
                             }
                         });
+                    } else {
+                        println!("supervisor: no update needed");
                     }
                 }
             }
