@@ -127,7 +127,8 @@ impl Supervisor {
     }
 
     pub(crate) async fn run(self, mut shutdown: rocket::Shutdown) -> Result<(), RunError> {
-        let next_path = UserDirs::new().ok_or(RunError::UserDirs)?.home_dir().join("bin").join("midos-house-next");
+        let user_dirs = UserDirs::new().ok_or(RunError::UserDirs)?;
+        let next_path = user_dirs.home_dir().join("bin").join("midos-house-next");
         let mut update = self.update.subscribe();
         self.refresh(false).await?;
         loop {
@@ -148,7 +149,7 @@ impl Supervisor {
                                 }
                             });
                             //TODO rustup
-                            Command::new("cargo").arg("build").arg("--release").arg("--target=x86_64-unknown-linux-musl").current_dir(BUILD_REPO_PATH).check("cargo build").await?;
+                            Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("build").arg("--release").arg("--target=x86_64-unknown-linux-musl").current_dir(BUILD_REPO_PATH).check("cargo build").await?;
                             fs::rename(Path::new(BUILD_REPO_PATH).join("target").join("x86_64-unknown-linux-musl").join("release").join("midos-house"), &next_path).await?;
                             Some(new_head)
                         } else {
