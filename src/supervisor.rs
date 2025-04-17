@@ -99,22 +99,27 @@ impl Supervisor {
                 Command::new("git").arg("fetch").current_dir(BUILD_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
                 let repo = gix::open(BUILD_REPO_PATH)?;
                 let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
-                lock!(@write status = self.status; {
+                let needs_update = lock!(@write status = self.status; {
                     let status_latest = status.future.last().map_or(status.running, |(latest, _)| *latest);
-                    let mut to_add = vec![new_head];
-                    let mut iter_commit = repo.find_commit(new_head)?;
-                    loop {
-                        let Ok(parent) = iter_commit.parent_ids().exactly_one() else {
-                            // initial commit or merge commit; skip parents for simplicity's sake
-                            break
-                        };
-                        if parent == status_latest { break }
-                        to_add.push(parent.detach());
-                        iter_commit = parent.object()?.peel_to_commit()?;
+                    if new_head != status_latest {
+                        let mut to_add = vec![new_head];
+                        let mut iter_commit = repo.find_commit(new_head)?;
+                        loop {
+                            let Ok(parent) = iter_commit.parent_ids().exactly_one() else {
+                                // initial commit or merge commit; skip parents for simplicity's sake
+                                break
+                            };
+                            if parent == status_latest { break }
+                            to_add.push(parent.detach());
+                            iter_commit = parent.object()?.peel_to_commit()?;
+                        }
+                        status.future.extend(to_add.into_iter().rev().map(|commit_hash| (commit_hash, CommitStatus::Pending)));
+                        true
+                    } else {
+                        false
                     }
-                    status.future.extend(to_add.into_iter().rev().map(|commit_hash| (commit_hash, CommitStatus::Pending)));
                 });
-                if new_head != repo.head_commit()?.id {
+                if needs_update {
                     self.update.send_replace(new_head);
                 }
             }
