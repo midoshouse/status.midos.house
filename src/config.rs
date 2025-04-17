@@ -1,5 +1,8 @@
 use serde::Deserialize;
-#[cfg(unix)] use xdg::BaseDirectories;
+#[cfg(unix)] use {
+    wheel::fs,
+    xdg::BaseDirectories,
+};
 #[cfg(windows)] use {
     tokio::process::Command,
     wheel::traits::IoResultExt as _,
