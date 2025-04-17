@@ -136,6 +136,7 @@ impl Supervisor {
         let next_path = user_dirs.home_dir().join("bin").join("midos-house-next");
         let mut update = self.update.subscribe();
         self.refresh(false).await?;
+        update.mark_changed();
         loop {
             select! {
                 () = &mut shutdown => break,
