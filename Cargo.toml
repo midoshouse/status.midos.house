@@ -38,3 +38,7 @@ wheel = { git = "https://github.com/fenhl/wheel", branch = "main", features = ["
 
 [target."cfg(unix)".dependencies]
 xdg = "2.5.2"
+
+[build-dependencies]
+gix = "0.71.0"
+itertools = "0.14.0"

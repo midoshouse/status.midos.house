@@ -46,6 +46,8 @@ use {
 mod config;
 mod supervisor;
 
+include!(concat!(env!("OUT_DIR"), "/version.rs"));
+
 #[rocket::get("/")]
 async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, supervisor::RefreshError> {
     supervisor.refresh(true, false).await?;

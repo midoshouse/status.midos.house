@@ -23,11 +23,13 @@ use {
             IoResultExt as _,
         },
     },
+    crate::GIT_COMMIT_HASH,
 };
 
 const BIN_PATH: &str = "/usr/local/share/midos-house/bin/midos-house";
 const LIVE_REPO_PATH: &str = "/opt/git/github.com/midoshouse/midos.house/main";
 const BUILD_REPO_PATH: &str = "/opt/git/github.com/midoshouse/midos.house/build";
+const SELF_REPO_PATH: &str = "/opt/git/github.com/midoshouse/status.midos.house/main";
 
 pub(crate) struct Status {
     pub(crate) running: gix::ObjectId,
@@ -45,7 +47,9 @@ pub(crate) enum CommitStatus {
 #[derive(Clone)]
 pub(crate) struct Supervisor {
     build_repo_lock: Arc<Mutex<Instant>>,
+    self_repo_lock: Arc<Mutex<Instant>>,
     update: watch::Sender<gix::ObjectId>,
+    self_update: watch::Sender<gix::ObjectId>,
     status: Arc<RwLock<Status>>,
 }
 
@@ -85,7 +89,9 @@ impl Supervisor {
         println!("initial running commit: {running}");
         Ok(Self {
             build_repo_lock: Arc::new(Mutex::new(Instant::now())),
+            self_repo_lock: Arc::new(Mutex::new(Instant::now())),
             update: watch::Sender::new(running),
+            self_update: watch::Sender::new(GIT_COMMIT_HASH),
             status: Arc::new(RwLock::new(Status {
                 running,
                 future: Vec::default(),
@@ -138,6 +144,30 @@ impl Supervisor {
         } else {
             println!("refresh: rate limited");
         }
+        drop(last_refresh);
+        println!("refresh: waiting for self repo lock");
+        let mut last_refresh = if block {
+            self.self_repo_lock.0.lock().await
+        } else {
+            if let Ok(last_refresh) = self.self_repo_lock.0.try_lock() {
+                last_refresh
+            } else {
+                return Ok(())
+            }
+        };
+        if !rate_limit || last_refresh.elapsed() >= Duration::from_secs(60) {
+            *last_refresh = Instant::now();
+            println!("refresh: fetching");
+            Command::new("git").arg("fetch").current_dir(SELF_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
+            let repo = gix::open(SELF_REPO_PATH)?;
+            let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
+            let needs_update = new_head != GIT_COMMIT_HASH;
+            if needs_update {
+                self.self_update.send_replace(new_head);
+            }
+        } else {
+            println!("refresh: rate limited");
+        }
         Ok(())
     }
 
@@ -152,6 +182,8 @@ impl Supervisor {
         let mut update = self.update.subscribe();
         self.refresh(false, true).await?;
         update.mark_changed();
+        let mut self_update = self.self_update.subscribe();
+        self_update.mark_changed();
         loop {
             println!("supervisor: waiting for events");
             select! {
@@ -218,6 +250,35 @@ impl Supervisor {
                         });
                     } else {
                         println!("supervisor: no update needed");
+                    }
+                }
+                res = self_update.changed() => {
+                    println!("supervisor: got self-update notification");
+                    let () = res.expect("all self-update senders dropped");
+                    let old_head = GIT_COMMIT_HASH;
+                    let needs_update = lock!(last_refresh = self.self_repo_lock; {
+                        Command::new("git").arg("pull").current_dir(SELF_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
+                        let new_head = gix::open(SELF_REPO_PATH)?.head_commit()?.id;
+                        if new_head != old_head {
+                            //TODO rustup
+                            println!("supervisor: building self {new_head}");
+                            Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("install-update").arg("--all").arg("--git").check("cargo install-update").await?;
+                            Some(new_head)
+                        } else {
+                            None
+                        }
+                    });
+                    if let Some(new_head) = needs_update {
+                        println!("supervisor: pulling own git repo");
+                        Command::new("git").arg("pull").current_dir(SELF_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
+                        println!("supervisor: updating self to {new_head}");
+                        Command::new("/usr/bin/systemctl").arg("restart").arg("mhstatus").spawn().at_command("systemctl restart")?;
+                        println!("supervisor: notifying rocket to shut down");
+                        shutdown.notify();
+                        println!("supervisor: exiting for self-restart");
+                        break
+                    } else {
+                        println!("supervisor: no self-update needed");
                     }
                 }
             }
