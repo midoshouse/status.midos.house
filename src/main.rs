@@ -48,7 +48,7 @@ mod supervisor;
 
 #[rocket::get("/")]
 async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, supervisor::RefreshError> {
-    supervisor.refresh(true).await?;
+    supervisor.refresh(true, false).await?;
     let supervisor::Status { ref running, ref future } = *supervisor.status().await;
     Ok(html! {
         : Doctype;
@@ -165,7 +165,7 @@ fn github_webhook(supervisor: &State<Supervisor>, payload: SignedPayload) {
     let _ = payload.0; // the data guard has verified that the request came from GitHub and we've only configured the webhook for push events for the midos.house repo for now
     let supervisor = (*supervisor).clone();
     tokio::spawn(async move {
-        match supervisor.refresh(false).await {
+        match supervisor.refresh(false, true).await {
             Ok(()) => {}
             Err(e) => {
                 let _ = wheel::night_report("/net/midoshouse/status/error", Some(&format!("refresh failed: {e} ({e:?})"))).await;

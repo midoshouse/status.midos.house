@@ -93,44 +93,51 @@ impl Supervisor {
         })
     }
 
-    pub(crate) async fn refresh(&self, rate_limit: bool) -> Result<(), RefreshError> {
+    pub(crate) async fn refresh(&self, rate_limit: bool, block: bool) -> Result<(), RefreshError> {
         println!("refresh: waiting for build repo lock");
-        lock!(last_refresh = self.build_repo_lock; {
-            if !rate_limit || last_refresh.elapsed() >= Duration::from_secs(60) {
-                *last_refresh = Instant::now();
-                println!("refresh: fetching");
-                Command::new("git").arg("fetch").current_dir(BUILD_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
-                let repo = gix::open(BUILD_REPO_PATH)?;
-                let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
-                let needs_update = lock!(@write status = self.status; {
-                    let status_latest = status.future.last().map_or(status.running, |(latest, _)| *latest);
-                    if new_head != status_latest {
-                        let mut to_add = vec![new_head];
-                        let mut iter_commit = repo.find_commit(new_head)?;
-                        loop {
-                            let Ok(parent) = iter_commit.parent_ids().exactly_one() else {
-                                // initial commit or merge commit; skip parents for simplicity's sake
-                                break
-                            };
-                            if parent == status_latest { break }
-                            to_add.push(parent.detach());
-                            iter_commit = parent.object()?.peel_to_commit()?;
-                        }
-                        status.future.extend(to_add.into_iter().rev().map(|commit_hash| (commit_hash, CommitStatus::Pending)));
-                        println!("refresh: updating from {status_latest} to {new_head}");
-                        true
-                    } else {
-                        println!("refresh: already up to date at {status_latest}");
-                        false
-                    }
-                });
-                if needs_update {
-                    self.update.send_replace(new_head);
-                }
+        let mut last_refresh = if block {
+            self.build_repo_lock.0.lock().await
+        } else {
+            if let Ok(last_refresh) = self.build_repo_lock.0.try_lock() {
+                last_refresh
             } else {
-                println!("refresh: rate limited");
+                return Ok(())
             }
-        });
+        };
+        if !rate_limit || last_refresh.elapsed() >= Duration::from_secs(60) {
+            *last_refresh = Instant::now();
+            println!("refresh: fetching");
+            Command::new("git").arg("fetch").current_dir(BUILD_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
+            let repo = gix::open(BUILD_REPO_PATH)?;
+            let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
+            let needs_update = lock!(@write status = self.status; {
+                let status_latest = status.future.last().map_or(status.running, |(latest, _)| *latest);
+                if new_head != status_latest {
+                    let mut to_add = vec![new_head];
+                    let mut iter_commit = repo.find_commit(new_head)?;
+                    loop {
+                        let Ok(parent) = iter_commit.parent_ids().exactly_one() else {
+                            // initial commit or merge commit; skip parents for simplicity's sake
+                            break
+                        };
+                        if parent == status_latest { break }
+                        to_add.push(parent.detach());
+                        iter_commit = parent.object()?.peel_to_commit()?;
+                    }
+                    status.future.extend(to_add.into_iter().rev().map(|commit_hash| (commit_hash, CommitStatus::Pending)));
+                    println!("refresh: updating from {status_latest} to {new_head}");
+                    true
+                } else {
+                    println!("refresh: already up to date at {status_latest}");
+                    false
+                }
+            });
+            if needs_update {
+                self.update.send_replace(new_head);
+            }
+        } else {
+            println!("refresh: rate limited");
+        }
         Ok(())
     }
 
@@ -143,7 +150,7 @@ impl Supervisor {
         let user_dirs = UserDirs::new().ok_or(RunError::UserDirs)?;
         let next_path = user_dirs.home_dir().join("bin").join("midos-house-next");
         let mut update = self.update.subscribe();
-        self.refresh(false).await?;
+        self.refresh(false, true).await?;
         update.mark_changed();
         loop {
             println!("supervisor: waiting for events");
@@ -154,7 +161,7 @@ impl Supervisor {
                 }
                 () = sleep(Duration::from_secs(24 * 60 * 60)) => {
                     println!("supervisor: no events after 1 hour, requesting refresh");
-                    self.refresh(true).await?;
+                    self.refresh(true, true).await?;
                 }
                 res = update.changed() => {
                     println!("supervisor: got update notification");
@@ -171,6 +178,7 @@ impl Supervisor {
                                 }
                             });
                             //TODO rustup
+                            println!("supervisor: building {new_head}");
                             Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("build").arg("--release").arg("--target=x86_64-unknown-linux-musl").current_dir(BUILD_REPO_PATH).check("cargo build").await?;
                             fs::rename(Path::new(BUILD_REPO_PATH).join("target").join("x86_64-unknown-linux-musl").join("release").join("midos-house"), &next_path).await?;
                             Some(new_head)
