@@ -1,0 +1,14 @@
+[Unit]
+Description=Deployment manager for midos.house
+Documentation=https://github.com/midoshouse/status.midos.house
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Restart=always
+ExecStart=/home/mido/.cargo/bin/mhstatus
+User=mido
+Group=nogroup
+
+[Install]
+WantedBy=multi-user.target

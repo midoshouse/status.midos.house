@@ -1,0 +1,40 @@
+[package]
+name = "mhstatus"
+version = "0.1.0"
+edition = "2024"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
+[lints.rust]
+rust_2018_idioms = "deny"
+unsafe_code = "forbid"
+unused = "deny"
+unused_crate_dependencies = "deny"
+unused_import_braces = "deny"
+unused_lifetimes = "deny"
+unused_qualifications = "deny"
+warnings = "deny"
+
+[dependencies]
+base64 = "0.22.1"
+directories = "6.0.0"
+futures = "0.3.31"
+gix = "0.71.0"
+itermore = { version = "0.7.1", features = ["array_chunks"] }
+itertools = "0.14.0"
+log-lock = { git = "https://github.com/fenhl/log-lock", branch = "main" }
+mimalloc = "0.1.46"
+rocket = { version = "0.5.1", features = ["secrets"] }
+rocket-util = { git = "https://github.com/fenhl/rocket-util", branch = "main" }
+rust-crypto = "0.2.36"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = { package = "serde_json_path_to_error", version = "0.1" }
+thiserror = "2.0.12"
+tokio = { version = "1.44.2", features = ["process", "sync", "time"] }
+wheel = { git = "https://github.com/fenhl/wheel", branch = "main", features = ["rocket"] }
+
+[target."cfg(unix)".dependencies]
+xdg = "2.5.2"
