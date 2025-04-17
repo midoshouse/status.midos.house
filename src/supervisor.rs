@@ -159,8 +159,8 @@ impl Supervisor {
                 res = update.changed() => {
                     println!("supervisor: got update notification");
                     let () = res.expect("all update senders dropped");
+                    let old_head = gix::open(LIVE_REPO_PATH)?.head_commit()?.id; //TODO once newer commits can be built during prepare-stop, this should be whichever version is at next_path, using this as fallback
                     let needs_update = lock!(last_refresh = self.build_repo_lock; {
-                        let old_head = gix::open(BUILD_REPO_PATH)?.head_commit()?.id;
                         Command::new("git").arg("pull").current_dir(BUILD_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
                         let new_head = gix::open(BUILD_REPO_PATH)?.head_commit()?.id;
                         if new_head != old_head {
