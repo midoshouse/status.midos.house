@@ -2,4 +2,5 @@ This is the code for [status.midos.house](https://status.midos.house/), the stat
 
 # Credits
 
-Lens of Truth icon by [Xopar](https://github.com/matthewkirby), used with permission.
+* Chest icon created by Maplestar for Mido's House.
+* Lens of Truth icon by [Xopar](https://github.com/matthewkirby), used with permission.

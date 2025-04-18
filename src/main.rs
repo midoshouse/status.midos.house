@@ -128,6 +128,11 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
     })
 }
 
+#[rocket::get("/chest.png")]
+fn chest() -> (ContentType, &'static [u8]) {
+    (ContentType::PNG, include_bytes!("../assets/chest.png"))
+}
+
 #[rocket::get("/lens.svg")]
 fn lens() -> (ContentType, &'static [u8]) {
     (ContentType::SVG, include_bytes!("../assets/lens.svg"))
@@ -262,6 +267,7 @@ async fn main() -> Result<(), Error> {
     })
     .mount("/", rocket::routes![
         index,
+        chest,
         lens,
         github_webhook,
     ])
