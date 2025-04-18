@@ -24,7 +24,10 @@ use {
             FromData,
             ToByteUnit as _,
         },
-        http::Status,
+        http::{
+            ContentType,
+            Status,
+        },
         outcome::Outcome,
         request::Request,
         response::content::RawHtml,
@@ -59,7 +62,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 meta(charset = "utf-8");
                 title : "Mido's House Status";
                 meta(name = "viewport", content = "width=device-width, initial-scale=1, shrink-to-fit=no");
-                //TODO favicon (Lens of Truth?)
+                link(rel = "icon", href = "/lens.svg");
                 style : RawHtml(include_str!("../assets/common.css"));
             }
             body {
@@ -107,6 +110,11 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
             }
         }
     })
+}
+
+#[rocket::get("/lens.svg")]
+fn lens() -> (ContentType, &'static [u8]) {
+    (ContentType::SVG, include_bytes!("../assets/lens.svg"))
 }
 
 macro_rules! guard_try {
@@ -238,6 +246,7 @@ async fn main() -> Result<(), Error> {
     })
     .mount("/", rocket::routes![
         index,
+        lens,
         github_webhook,
     ])
     .register("/", rocket::catchers![
