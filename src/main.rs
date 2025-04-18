@@ -31,6 +31,7 @@ use {
         outcome::Outcome,
         request::Request,
         response::content::RawHtml,
+        uri,
     },
     rocket_util::{
         Doctype,
@@ -62,11 +63,17 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 meta(charset = "utf-8");
                 title : "Mido's House Status";
                 meta(name = "viewport", content = "width=device-width, initial-scale=1, shrink-to-fit=no");
-                link(rel = "icon", href = "/lens.svg");
+                link(rel = "icon", href = uri!(lens));
                 style : RawHtml(include_str!("../assets/common.css"));
             }
             body {
                 h1 {
+                    span(class = "logo") {
+                        img(class = "chest", src = uri!(chest));
+                        img(class = "chest", src = uri!(chest));
+                        img(class = "chest", src = uri!(chest));
+                        img(class = "chest", src = uri!(chest));
+                    }
                     : "Mido's House ";
                     span(class = "subtitle") : "Website, Discord bot, racetime.gg bot";
                 }
@@ -113,6 +120,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 }
                 //TODO multiworld
                 h1 {
+                    img(src = uri!(lens));
                     : "status.midos.house ";
                     span(class = "subtitle") : "this page";
                 }

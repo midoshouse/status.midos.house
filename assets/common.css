@@ -2,6 +2,27 @@ body {
     font-family: system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+.logo {
+    display: grid;
+    grid-template-columns: 25px 25px;
+    direction: ltr;
+}
+
+.chest {
+    width: 25px;
+    height: 25px;
+    padding: 0;
+}
+
+.h1 > a {
+    height: 50px;
+}
+
+.logo,
+.h1 > a {
+    vertical-align: bottom;
+}
+
 .subtitle {
     font-style: italic;
     font-weight: normal;
