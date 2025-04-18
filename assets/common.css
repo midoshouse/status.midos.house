@@ -3,7 +3,7 @@ body {
 }
 
 .logo {
-    display: grid;
+    display: inline grid;
     grid-template-columns: 25px 25px;
     direction: ltr;
 }
