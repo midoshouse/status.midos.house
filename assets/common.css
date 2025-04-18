@@ -2,6 +2,12 @@ body {
     font-family: system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+.subtitle {
+    font-style: italic;
+    font-weight: normal;
+    font-size: small;
+}
+
 a {
     color: inherit;
 }

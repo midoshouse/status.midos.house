@@ -66,6 +66,10 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 style : RawHtml(include_str!("../assets/common.css"));
             }
             body {
+                h1 {
+                    : "Mido's House ";
+                    span(class = "subtitle") : "Website, Discord bot, racetime.gg bot";
+                }
                 p {
                     : "Currently running: ";
                     code {
@@ -107,6 +111,18 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         }
                     }
                 }
+                //TODO multiworld
+                h1 {
+                    : "status.midos.house ";
+                    span(class = "subtitle") : "this page";
+                }
+                p {
+                    : "Currently running: ";
+                    code {
+                        a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{GIT_COMMIT_HASH}")) : GIT_COMMIT_HASH.to_hex_with_len(7).to_string();
+                    }
+                }
+                //TODO self-updater status
             }
         }
     })
