@@ -246,7 +246,7 @@ impl Supervisor {
                         lock!(@write status = self.status; {
                             status.running = new_head;
                             if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
-                                status.future.drain(..idx);
+                                status.future.drain(..=idx);
                             }
                         });
                     } else {
