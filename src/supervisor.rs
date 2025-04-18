@@ -113,7 +113,7 @@ impl Supervisor {
         };
         if !rate_limit || last_refresh.elapsed() >= Duration::from_secs(60) {
             *last_refresh = Instant::now();
-            println!("refresh: fetching");
+            println!("refresh: fetching midos.house");
             Command::new("git").arg("fetch").current_dir(BUILD_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
             let repo = gix::open(BUILD_REPO_PATH)?;
             let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
@@ -158,7 +158,7 @@ impl Supervisor {
         };
         if !rate_limit || last_refresh.elapsed() >= Duration::from_secs(60) {
             *last_refresh = Instant::now();
-            println!("refresh: fetching");
+            println!("refresh: fetching self");
             Command::new("git").arg("fetch").current_dir(SELF_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
             let repo = gix::open(SELF_REPO_PATH)?;
             let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
