@@ -271,7 +271,9 @@ impl Supervisor {
                     });
                     if let Some(new_head) = needs_update {
                         println!("supervisor: pulling own git repo");
-                        Command::new("git").arg("pull").current_dir(SELF_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
+                        lock!(last_refresh = self.self_repo_lock; {
+                            Command::new("git").arg("pull").current_dir(SELF_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
+                        });
                         println!("supervisor: updating self to {new_head}");
                         Command::new("/usr/bin/systemctl").arg("restart").arg("mhstatus").spawn().at_command("systemctl restart")?;
                         println!("supervisor: notifying rocket to shut down");
