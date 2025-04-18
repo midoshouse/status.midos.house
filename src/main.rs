@@ -67,15 +67,17 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 style : RawHtml(include_str!("../assets/common.css"));
             }
             body {
-                h1 {
-                    span(class = "logo") {
+                div(class = "header") {
+                    div(class = "logo") {
                         img(class = "chest", src = uri!(chest));
                         img(class = "chest", src = uri!(chest));
                         img(class = "chest", src = uri!(chest));
                         img(class = "chest", src = uri!(chest));
                     }
-                    : "Mido's House ";
-                    span(class = "subtitle") : "Website, Discord bot, racetime.gg bot";
+                    div(class = "header-text") {
+                        h1 : "Mido's House ";
+                        div(class = "subtitle") : "Website, Discord bot, racetime.gg bot";
+                    }
                 }
                 p {
                     : "Currently running: ";
@@ -119,10 +121,12 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                     }
                 }
                 //TODO multiworld
-                h1 {
+                div(class = "header") {
                     img(src = uri!(lens));
-                    : "status.midos.house ";
-                    span(class = "subtitle") : "this page";
+                    div(class = "header-text") {
+                        h1 : "status.midos.house ";
+                        div(class = "subtitle") : "this page";
+                    }
                 }
                 p {
                     : "Currently running: ";

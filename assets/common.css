@@ -2,8 +2,12 @@ body {
     font-family: system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+.header {
+    display: flex;
+}
+
 .logo {
-    display: inline grid;
+    display: grid;
     grid-template-columns: 25px 25px;
     direction: ltr;
 }
@@ -14,13 +18,22 @@ body {
     padding: 0;
 }
 
-h1 > img {
+.header > img {
     height: 50px;
 }
 
 .logo,
-h1 > img {
-    vertical-align: bottom;
+.header > img {
+    align-self: end;
+}
+
+.header-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.header-text h1 {
+    margin: 0;
 }
 
 .subtitle {
