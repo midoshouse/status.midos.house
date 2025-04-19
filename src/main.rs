@@ -52,6 +52,8 @@ mod supervisor;
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
+const MW_REPO_PATH: &str = "/opt/git/github.com/midoshouse/ootr-multiworld/main";
+
 #[rocket::get("/")]
 async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, supervisor::RefreshError> {
     supervisor.refresh(true, false).await?;
@@ -120,6 +122,20 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         }
                     }
                 }
+                div(class = "header") {
+                    img(src = uri!(mw_logo));
+                    div(class = "header-text") {
+                        h1 : "Multiworld";
+                        div(class = "subtitle") : "default room server";
+                    }
+                }
+                p {
+                    @let mw_commit_hash = gix::open(MW_REPO_PATH)?.head_commit()?.id;
+                    : "Currently running: ";
+                    code {
+                        a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{mw_commit_hash}")) : mw_commit_hash.to_hex_with_len(7).to_string();
+                    }
+                }
                 //TODO multiworld
                 div(class = "header") {
                     img(src = uri!(lens));
@@ -143,6 +159,11 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
 #[rocket::get("/chest.png")]
 fn chest() -> (ContentType, &'static [u8]) {
     (ContentType::PNG, include_bytes!("../assets/chest.png"))
+}
+
+#[rocket::get("/mw.png")]
+fn mw_logo() -> (ContentType, &'static [u8]) {
+    (ContentType::PNG, include_bytes!("../assets/mw.png"))
 }
 
 #[rocket::get("/lens.svg")]
@@ -280,6 +301,7 @@ async fn main() -> Result<(), Error> {
     .mount("/", rocket::routes![
         index,
         chest,
+        mw_logo,
         lens,
         github_webhook,
     ])
