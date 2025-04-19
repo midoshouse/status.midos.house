@@ -133,10 +133,9 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                     @let mw_commit_hash = gix::open(MW_REPO_PATH)?.head_commit()?.id;
                     : "Currently running: ";
                     code {
-                        a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{mw_commit_hash}")) : mw_commit_hash.to_hex_with_len(7).to_string();
+                        a(href = format!("https://github.com/midoshouse/ootr-multiworld/commit/{mw_commit_hash}")) : mw_commit_hash.to_hex_with_len(7).to_string();
                     }
                 }
-                //TODO multiworld
                 div(class = "header") {
                     img(src = uri!(lens));
                     div(class = "header-text") {
