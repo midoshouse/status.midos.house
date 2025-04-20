@@ -274,7 +274,8 @@ impl Supervisor {
                         println!("supervisor: stopping old version");
                         Command::new("sudo").arg("/usr/bin/systemctl").arg("stop").arg("midos-house").check("systemctl stop").await?;
                         println!("supervisor: pulling git repo");
-                        Command::new("git").arg("pull").current_dir(LIVE_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
+                        Command::new("git").arg("fetch").current_dir(LIVE_REPO_PATH).check("git fetch").await?;
+                        Command::new("git").arg("reset").arg("--hard").arg(new_head.to_string()).current_dir(LIVE_REPO_PATH).check("git reset").await?;
                         println!("supervisor: replacing binary");
                         Command::new("chmod").arg("+x").arg(&next_path).check("chmod").await?;
                         fs::rename(&next_path, BIN_PATH).await?;
@@ -308,15 +309,17 @@ impl Supervisor {
                             //TODO rustup
                             println!("supervisor: building self {new_head}");
                             Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("install-update").arg("--all").arg("--git").check("cargo install-update").await?;
-                            true
+                            Some(new_head)
                         } else {
-                            false
+                            None
                         }
                     });
-                    if needs_update {
+                    if let Some(new_head) = needs_update {
                         println!("supervisor: pulling own git repo");
                         lock!(last_refresh = self.self_repo_lock; {
-                            Command::new("git").arg("pull").current_dir(SELF_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
+                            //TODO use gix (how?)
+                            Command::new("git").arg("fetch").current_dir(SELF_REPO_PATH).check("git fetch").await?;
+                            Command::new("git").arg("reset").arg("--hard").arg(new_head.to_string()).current_dir(SELF_REPO_PATH).check("git reset").await?;
                         });
                         println!("supervisor: notifying rocket to shut down");
                         shutdown.notify();
