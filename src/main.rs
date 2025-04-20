@@ -150,7 +150,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{GIT_COMMIT_HASH}")) : GIT_COMMIT_HASH.to_hex_with_len(7).to_string();
                     }
                 }
-                @if future.is_empty() {
+                @if self_future.is_empty() {
                     p : "status.midos.house is up to date.";
                 } else {
                     p : "Pending updates:";
