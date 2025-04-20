@@ -34,6 +34,7 @@ const SELF_REPO_PATH: &str = "/opt/git/github.com/midoshouse/status.midos.house/
 pub(crate) struct Status {
     pub(crate) running: gix::ObjectId,
     pub(crate) future: Vec<(gix::ObjectId, String, CommitStatus)>,
+    pub(crate) self_future: Vec<(gix::ObjectId, String, SelfCommitStatus)>,
 }
 
 pub(crate) enum CommitStatus {
@@ -42,6 +43,12 @@ pub(crate) enum CommitStatus {
     Build,
     PrepareStop,
     Deploy,
+}
+
+pub(crate) enum SelfCommitStatus {
+    Pending,
+    Skipped,
+    Build,
 }
 
 #[derive(Clone)]
@@ -96,11 +103,12 @@ impl Supervisor {
             status: Arc::new(RwLock::new(Status {
                 running,
                 future: Vec::default(),
+                self_future: Vec::default(),
             })),
         })
     }
 
-    pub(crate) async fn refresh(&self, rate_limit: bool, block: bool) -> Result<(), RefreshError> {
+    async fn refresh_mh(&self, rate_limit: bool, block: bool) -> Result<(), RefreshError> {
         let mut last_refresh = if block {
             println!("refresh: waiting for build repo lock");
             self.build_repo_lock.0.lock().await
@@ -145,7 +153,10 @@ impl Supervisor {
         } else {
             println!("refresh: rate limited");
         }
-        drop(last_refresh);
+        Ok(())
+    }
+
+    async fn refresh_self(&self, rate_limit: bool, block: bool) -> Result<(), RefreshError> {
         let mut last_refresh = if block {
             println!("refresh: waiting for self repo lock");
             self.self_repo_lock.0.lock().await
@@ -162,13 +173,40 @@ impl Supervisor {
             Command::new("git").arg("fetch").current_dir(SELF_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
             let repo = gix::open(SELF_REPO_PATH)?;
             let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
-            let needs_update = new_head != GIT_COMMIT_HASH;
+            let needs_update = lock!(@write status = self.status; {
+                let status_latest = status.self_future.last().map_or(GIT_COMMIT_HASH, |(latest, _, _)| *latest);
+                if new_head != status_latest {
+                    let mut iter_commit = repo.find_commit(new_head)?;
+                    let mut to_add = vec![(new_head, iter_commit.message()?.summary().to_string())];
+                    loop {
+                        let Ok(parent) = iter_commit.parent_ids().exactly_one() else {
+                            // initial commit or merge commit; skip parents for simplicity's sake
+                            break
+                        };
+                        if parent == status_latest { break }
+                        iter_commit = parent.object()?.peel_to_commit()?;
+                        to_add.push((parent.detach(), iter_commit.message()?.summary().to_string()));
+                    }
+                    status.self_future.extend(to_add.into_iter().rev().map(|(commit_hash, commit_msg)| (commit_hash, commit_msg, SelfCommitStatus::Pending)));
+                    println!("refresh: updating self from {status_latest} to {new_head}");
+                    true
+                } else {
+                    println!("refresh: self already up to date at {status_latest}");
+                    false
+                }
+            });
             if needs_update {
                 self.self_update.send_replace(new_head);
             }
         } else {
             println!("refresh: rate limited");
         }
+        Ok(())
+    }
+
+    pub(crate) async fn refresh(&self, rate_limit: bool, block: bool) -> Result<(), RefreshError> {
+        self.refresh_mh(rate_limit, block).await?;
+        self.refresh_self(rate_limit, block).await?;
         Ok(())
     }
 
@@ -261,6 +299,12 @@ impl Supervisor {
                         Command::new("git").arg("pull").current_dir(SELF_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
                         let new_head = gix::open(SELF_REPO_PATH)?.head_commit()?.id;
                         if new_head != old_head {
+                            lock!(@write status = self.status; if let Some(idx) = status.self_future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                status.self_future[idx].2 = SelfCommitStatus::Build;
+                                for idx in 0..idx {
+                                    status.self_future[idx].2 = SelfCommitStatus::Skipped;
+                                }
+                            });
                             //TODO rustup
                             println!("supervisor: building self {new_head}");
                             Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("install-update").arg("--all").arg("--git").check("cargo install-update").await?;

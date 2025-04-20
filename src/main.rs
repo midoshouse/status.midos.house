@@ -42,6 +42,7 @@ use {
         config::Config,
         supervisor::{
             CommitStatus,
+            SelfCommitStatus,
             Supervisor,
         },
     },
@@ -57,7 +58,7 @@ const MW_REPO_PATH: &str = "/opt/git/github.com/midoshouse/ootr-multiworld/main"
 #[rocket::get("/")]
 async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, supervisor::RefreshError> {
     supervisor.refresh(true, false).await?;
-    let supervisor::Status { ref running, ref future } = *supervisor.status().await;
+    let supervisor::Status { ref running, ref future, ref self_future } = *supervisor.status().await;
     Ok(html! {
         : Doctype;
         html {
@@ -149,7 +150,39 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{GIT_COMMIT_HASH}")) : GIT_COMMIT_HASH.to_hex_with_len(7).to_string();
                     }
                 }
-                //TODO self-updater status
+                @if future.is_empty() {
+                    p : "status.midos.house is up to date.";
+                } else {
+                    p : "Pending updates:";
+                    table {
+                        thead {
+                            tr {
+                                th : "Commit";
+                                th : "Summary";
+                                th : "Status";
+                            }
+                        }
+                        tbody {
+                            @for (commit_hash, commit_msg, status) in self_future {
+                                tr {
+                                    td {
+                                        code {
+                                            a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{commit_hash}")) : commit_hash.to_hex_with_len(7).to_string();
+                                        }
+                                    }
+                                    td : commit_msg;
+                                    td {
+                                        @match status {
+                                            SelfCommitStatus::Pending => : "waiting for other builds to finish";
+                                            SelfCommitStatus::Skipped => : "skipped";
+                                            SelfCommitStatus::Build => : "building";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     })
