@@ -137,6 +137,11 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         a(href = format!("https://github.com/midoshouse/ootr-multiworld/commit/{mw_commit_hash}")) : mw_commit_hash.to_hex_with_len(7).to_string();
                     }
                 }
+                p { //TODO determine server update status (major updates still need to be managed by release script to coordinate with client releases, but minor/patch/same-version updates could be managed by the supervisor)
+                    : "Please see ";
+                    a(href = "https://github.com/midoshouse/ootr-multiworld/commits/main") : "GitHub";
+                    : " for a ";
+                }
                 div(class = "header") {
                     img(src = uri!(lens));
                     div(class = "header-text") {
