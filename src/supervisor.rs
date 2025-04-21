@@ -1,9 +1,13 @@
 use {
     std::{
+        borrow::Cow,
+        env,
+        iter,
         path::Path,
         sync::Arc,
         time::Duration,
     },
+    dir_lock::DirLock,
     directories::UserDirs,
     itertools::Itertools as _,
     log_lock::*,
@@ -20,16 +24,24 @@ use {
         fs,
         traits::{
             AsyncCommandOutputExt as _,
+            CommandExt as _,
             IoResultExt as _,
         },
     },
+    which::which,
     crate::GIT_COMMIT_HASH,
 };
+#[cfg(windows)] use directories::BaseDirs;
 
 const BIN_PATH: &str = "/usr/local/share/midos-house/bin/midos-house";
 const LIVE_REPO_PATH: &str = "/opt/git/github.com/midoshouse/midos.house/main";
 const BUILD_REPO_PATH: &str = "/opt/git/github.com/midoshouse/midos.house/build";
 const SELF_REPO_PATH: &str = "/opt/git/github.com/midoshouse/status.midos.house/main";
+
+fn rust_lock_dir() -> Cow<'static, Path> {
+    #[cfg(unix)] { Cow::Borrowed(Path::new("/tmp/syncbin-startup-rust.lock")) }
+    #[cfg(windows)] { Cow::Owned(BaseDirs::new().expect("could not determine home dir").data_local_dir().join("Temp").join("syncbin-startup-rust.lock")) }
+}
 
 pub(crate) struct Status {
     pub(crate) running: gix::ObjectId,
@@ -81,6 +93,8 @@ pub(crate) enum RefreshError {
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum RunError {
+    #[error(transparent)] DirLock(#[from] dir_lock::Error),
+    #[error(transparent)] EnvJoinPaths(#[from] env::JoinPathsError),
     #[error(transparent)] GitFindReference(#[from] gix::reference::find::existing::Error),
     #[error(transparent)] GitHeadCommit(#[from] gix::reference::head_commit::Error),
     #[error(transparent)] GitOpen(#[from] gix::open::Error),
@@ -237,7 +251,7 @@ impl Supervisor {
                 res = update.changed() => {
                     println!("supervisor: got update notification");
                     let () = res.expect("all update senders dropped");
-                    let old_head = gix::open(LIVE_REPO_PATH)?.head_commit()?.id; //TODO once newer commits can be built during prepare-stop, this should be whichever version is at next_path, using this as fallback
+                    let old_head = gix::open(LIVE_REPO_PATH)?.head_commit()?.id; //TODO once newer commits can be built during prepare-stop, this needs to differentiate between “is there a commit to build” and “is there a build to deploy”, checking the prepared build at next_path if any
                     let needs_update = lock!(last_refresh = self.build_repo_lock; {
                         Command::new("git").arg("pull").current_dir(BUILD_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
                         let new_head = gix::open(BUILD_REPO_PATH)?.head_commit()?.id;
@@ -248,7 +262,27 @@ impl Supervisor {
                                     status.future[idx].2 = CommitStatus::Skipped;
                                 }
                             });
-                            //TODO rustup
+                            if !which("rustup").is_ok_and(|rustup_path| rustup_path.starts_with("/nix/store")) { // skip self-update if rustup is managed //TODO update rustup via nix
+                                println!("supervisor: updating rustup");
+                                let lock = DirLock::new(rust_lock_dir()).await?;
+                                let mut rustup_cmd = Command::new("rustup");
+                                rustup_cmd.arg("self");
+                                rustup_cmd.arg("update");
+                                rustup_cmd.env("PATH", env::join_paths(iter::once(user_dirs.home_dir().join(".cargo").join("bin")).chain(env::var_os("PATH").map(|path| env::split_paths(&path).collect::<Vec<_>>()).into_iter().flatten()))?);
+                                rustup_cmd.create_no_window();
+                                rustup_cmd.check("rustup").await?;
+                                lock.drop_async().await?;
+                            }
+                            println!("supervisor: updating Rust");
+                            let lock = DirLock::new(rust_lock_dir()).await?;
+                            let mut rustup_cmd = Command::new("rustup");
+                            rustup_cmd.arg("update");
+                            rustup_cmd.arg("stable");
+                            rustup_cmd.env("PATH", env::join_paths(iter::once(user_dirs.home_dir().join(".cargo").join("bin")).chain(env::var_os("PATH").map(|path| env::split_paths(&path).collect::<Vec<_>>()).into_iter().flatten()))?);
+                            rustup_cmd.create_no_window();
+                            rustup_cmd.check("rustup").await?;
+                            lock.drop_async().await?;
+                            //TODO cargo sweep (limit to once per Rust version)
                             println!("supervisor: building {new_head}");
                             Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("build").arg("--release").arg("--target=x86_64-unknown-linux-musl").current_dir(BUILD_REPO_PATH).check("cargo build").await?;
                             fs::rename(Path::new(BUILD_REPO_PATH).join("target").join("x86_64-unknown-linux-musl").join("release").join("midos-house"), &next_path).await?;
@@ -306,7 +340,27 @@ impl Supervisor {
                                     status.self_future[idx].2 = SelfCommitStatus::Skipped;
                                 }
                             });
-                            //TODO rustup
+                            if !which("rustup").is_ok_and(|rustup_path| rustup_path.starts_with("/nix/store")) { // skip self-update if rustup is managed //TODO update rustup via nix
+                                println!("supervisor: updating rustup");
+                                let lock = DirLock::new(rust_lock_dir()).await?;
+                                let mut rustup_cmd = Command::new("rustup");
+                                rustup_cmd.arg("self");
+                                rustup_cmd.arg("update");
+                                rustup_cmd.env("PATH", env::join_paths(iter::once(user_dirs.home_dir().join(".cargo").join("bin")).chain(env::var_os("PATH").map(|path| env::split_paths(&path).collect::<Vec<_>>()).into_iter().flatten()))?);
+                                rustup_cmd.create_no_window();
+                                rustup_cmd.check("rustup").await?;
+                                lock.drop_async().await?;
+                            }
+                            println!("supervisor: updating Rust");
+                            let lock = DirLock::new(rust_lock_dir()).await?;
+                            let mut rustup_cmd = Command::new("rustup");
+                            rustup_cmd.arg("update");
+                            rustup_cmd.arg("stable");
+                            rustup_cmd.env("PATH", env::join_paths(iter::once(user_dirs.home_dir().join(".cargo").join("bin")).chain(env::var_os("PATH").map(|path| env::split_paths(&path).collect::<Vec<_>>()).into_iter().flatten()))?);
+                            rustup_cmd.create_no_window();
+                            rustup_cmd.check("rustup").await?;
+                            lock.drop_async().await?;
+                            //TODO cargo sweep (limit to once per Rust version)
                             println!("supervisor: building self {new_head}");
                             Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("install-update").arg("--all").arg("--git").check("cargo install-update").await?;
                             Some(new_head)
