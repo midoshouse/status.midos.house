@@ -2,7 +2,6 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use {
-    async_proto as _, //TODO use `--async-proto` flag of `midos-hose prepare-stop` once MH commit ae3c9bf is deployed
     base64::engine::{
         Engine as _,
         general_purpose::STANDARD as BASE64,
@@ -14,7 +13,6 @@ use {
     },
     futures::future::FutureExt as _,
     itermore::IterArrayChunks as _,
-    mhstatus as _, //TODO use `--async-proto` flag of `midos-house prepare-stop` once MH commit ae3c9bf is deployed
     rocket::{
         Rocket,
         State,
@@ -39,6 +37,7 @@ use {
         Doctype,
         html,
     },
+    url as _, // only used in lib
     wheel::traits::IoResultExt as _,
     crate::{
         config::Config,
@@ -116,7 +115,20 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                                             CommitStatus::Pending => : "waiting for other builds to finish";
                                             CommitStatus::Skipped => : "skipped";
                                             CommitStatus::Build => : "building";
-                                            CommitStatus::PrepareStop => : "waiting for ongoing races to stop";
+                                            CommitStatus::PrepareStopInit => : "waiting for reply to shutdown request";
+                                            CommitStatus::PrepareStopAcquiringMutex => : "waiting for access to clean shutdown state";
+                                            CommitStatus::WaitingForRooms(rooms) => div(class = "favicon-container") {
+                                                : "waiting for ongoing races to stop:";
+                                                @if rooms.is_empty() {
+                                                    : "(private async parts)";
+                                                } else {
+                                                    @for room in rooms {
+                                                        a(class = "favicon", title = "race room", href = room.public_url("racetime.gg").unwrap().to_string()) {
+                                                            img(class = "favicon", alt = "external link (racetime.gg)", src = uri!(racetime_logo));
+                                                        }
+                                                    }
+                                                }
+                                            }
                                             CommitStatus::Deploy => : "deploying";
                                         }
                                     }
@@ -208,6 +220,11 @@ fn mw_logo() -> (ContentType, &'static [u8]) {
 #[rocket::get("/lens.svg")]
 fn lens() -> (ContentType, &'static [u8]) {
     (ContentType::SVG, include_bytes!("../assets/lens.svg"))
+}
+
+#[rocket::get("/racetime.svg")]
+fn racetime_logo() -> (ContentType, &'static [u8]) {
+    (ContentType::SVG, include_bytes!("../assets/racetimeGG-favicon.svg"))
 }
 
 macro_rules! guard_try {
@@ -342,6 +359,7 @@ async fn main() -> Result<(), Error> {
         chest,
         mw_logo,
         lens,
+        racetime_logo,
         github_webhook,
     ])
     .register("/", rocket::catchers![

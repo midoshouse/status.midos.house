@@ -1,15 +1,22 @@
 use {
     std::{
         borrow::Cow,
+        collections::HashSet,
         env,
         iter,
         path::Path,
+        process::Stdio,
         sync::Arc,
         time::Duration,
     },
+    async_proto::Protocol as _,
     dir_lock::DirLock,
     directories::UserDirs,
     itertools::Itertools as _,
+    mhstatus::{
+        OpenRoom,
+        PrepareStopUpdate,
+    },
     log_lock::*,
     tokio::{
         process::Command,
@@ -53,7 +60,9 @@ pub(crate) enum CommitStatus {
     Pending,
     Skipped,
     Build,
-    PrepareStop,
+    PrepareStopInit,
+    PrepareStopAcquiringMutex,
+    WaitingForRooms(HashSet<OpenRoom>),
     Deploy,
 }
 
@@ -99,6 +108,7 @@ pub(crate) enum RunError {
     #[error(transparent)] GitHeadCommit(#[from] gix::reference::head_commit::Error),
     #[error(transparent)] GitOpen(#[from] gix::open::Error),
     #[error(transparent)] GitPeelReference(#[from] gix::reference::peel::to_kind::Error),
+    #[error(transparent)] Read(#[from] async_proto::ReadError),
     #[error(transparent)] Refresh(#[from] RefreshError),
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[error("failed to access user directories")]
@@ -295,12 +305,44 @@ impl Supervisor {
                         println!("supervisor: updating to {new_head}");
                         if Command::new("/usr/bin/systemctl").arg("is-active").arg("midos-house").status().await.at_command("systemctl is-active")?.success() {
                             lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
-                                status.future[idx].2 = CommitStatus::PrepareStop;
+                                status.future[idx].2 = CommitStatus::PrepareStopInit;
                             });
                             // intentionally not checking exit status as prepare-stop crashing is also a good reason to restart Mido's House
                             //TODO allow building newer commits during prepare-stop
                             println!("supervisor: preparing to stop");
-                            Command::new(BIN_PATH).arg("prepare-stop").status().await.at_command("midos-house prepare-stop")?;
+                            let mut child = Command::new(BIN_PATH).arg("prepare-stop").arg("--async-proto").stdout(Stdio::piped()).spawn().at_command("midos-house prepare-stop")?;
+                            let mut stdout = child.stdout.take().expect("stdout was piped");
+                            loop {
+                                select! {
+                                    res = PrepareStopUpdate::read(&mut stdout) => match res? {
+                                        PrepareStopUpdate::AcquiringMutex => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                            status.future[idx].2 = CommitStatus::PrepareStopAcquiringMutex;
+                                        }),
+                                        PrepareStopUpdate::WaitingForRooms(mut rooms) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                            rooms.retain(|room| room.is_public());
+                                            status.future[idx].2 = CommitStatus::WaitingForRooms(rooms);
+                                        }),
+                                        PrepareStopUpdate::RoomOpened(room) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                            if room.is_public() {
+                                                if let CommitStatus::WaitingForRooms(rooms) = &mut status.future[idx].2 {
+                                                    rooms.insert(room);
+                                                }
+                                            }
+                                        }),
+                                        PrepareStopUpdate::RoomClosed(room) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                            if room.is_public() {
+                                                if let CommitStatus::WaitingForRooms(rooms) = &mut status.future[idx].2 {
+                                                    rooms.remove(&room);
+                                                }
+                                            }
+                                        }),
+                                    },
+                                    res = (&mut child).check("midos-house prepare-stop") => {
+                                        let _ = res?;
+                                        break
+                                    }
+                                }
+                            }
                         }
                         lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                             status.future[idx].2 = CommitStatus::Deploy;

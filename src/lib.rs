@@ -6,6 +6,7 @@ use {
         fmt,
     },
     async_proto::Protocol,
+    url::Url,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Protocol)]
@@ -35,7 +36,25 @@ pub enum OpenRoom {
 }
 
 impl OpenRoom {
-    fn to_string(&self, racetime_host: &'static str) -> String {
+    pub fn is_public(&self) -> bool {
+        match self {
+            Self::Discord(..) => false,
+            Self::RaceTime { public, .. } => *public,
+        }
+    }
+
+    pub fn public_url(&self, racetime_host: &'static str) -> Option<Url> {
+        match self {
+            Self::Discord(..) => None,
+            Self::RaceTime { room_url, public } => if *public {
+                Some(format!("https://{racetime_host}{room_url}").parse().unwrap())
+            } else {
+                None
+            },
+        }
+    }
+
+    pub fn to_string(&self, racetime_host: &'static str) -> String {
         match self {
             Self::Discord(race_id, kind) => format!("Discord race handler for {}race {race_id}", match kind {
                 EventKind::Normal => "",
