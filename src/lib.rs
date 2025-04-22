@@ -1,4 +1,4 @@
-#![allow(unused_crate_dependencies)] // mixed lib/bin crate
+#![allow(unused_crate_dependencies)] // mixed lib/bin crate TODO split into separate crates to get rid of unused dependencies in dependents of this lib
 
 use {
     std::{
@@ -9,7 +9,7 @@ use {
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Protocol)]
-pub struct RaceId(u64);
+pub struct RaceId(pub u64);
 
 impl fmt::Display for RaceId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
