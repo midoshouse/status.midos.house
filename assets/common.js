@@ -109,7 +109,7 @@ function startWebsocket() {
                     document.getElementById('self-future-empty').removeAttribute('style');
                     document.getElementById('self-future-empty').replaceChildren(document.createTextNode('status.midos.house is restarting…'));
                     document.getElementById('self-future-nonempty').setAttribute('style', 'display: none;');
-                    setTimeout(window.location.reload, 1000);
+                    setTimeout(window.location.reload.bind(window.location), 1000);
                     break;
                 }
             }
