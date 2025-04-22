@@ -2,6 +2,7 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use {
+    async_proto as _, //TODO use `--async-proto` flag of `midos-hose prepare-stop` once MH commit ae3c9bf is deployed
     base64::engine::{
         Engine as _,
         general_purpose::STANDARD as BASE64,
@@ -13,6 +14,7 @@ use {
     },
     futures::future::FutureExt as _,
     itermore::IterArrayChunks as _,
+    mhstatus as _, //TODO use `--async-proto` flag of `midos-house prepare-stop` once MH commit ae3c9bf is deployed
     rocket::{
         Rocket,
         State,

@@ -154,6 +154,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
+name = "async-proto"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4fcbf3f132553a948de043513a8e99e7c26d8445deec09f97079fd022efa4c8"
+dependencies = [
+ "async-proto-derive",
+ "byteorder",
+ "fallible_collections",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "async-proto-derive"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0894d10a81ea0c0378320d763e724ab9ea88d87aeb3ee3ecbed727e9cb113066"
+dependencies = [
+ "itertools",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -691,6 +716,15 @@ checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
 dependencies = [
  "libc",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "fallible_collections"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b3e85d14d419ba3e1db925519461c0d17a49bdd2d67ea6316fa965ca7acdf74"
+dependencies = [
+ "hashbrown 0.14.5",
 ]
 
 [[package]]
@@ -2506,6 +2540,7 @@ dependencies = [
 name = "mhstatus"
 version = "0.1.0"
 dependencies = [
+ "async-proto",
  "base64 0.22.1",
  "dir-lock",
  "directories",
