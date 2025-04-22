@@ -9,7 +9,11 @@ use {
         sync::Arc,
         time::Duration,
     },
-    async_proto::Protocol as _,
+    async_proto::{
+        Protocol as _,
+        ReadError,
+        ReadErrorKind,
+    },
     dir_lock::DirLock,
     directories::UserDirs,
     itertools::Itertools as _,
@@ -20,6 +24,7 @@ use {
     log_lock::*,
     serde::Serialize,
     tokio::{
+        io,
         process::Command,
         select,
         sync::watch,
@@ -116,7 +121,7 @@ pub(crate) enum RunError {
     #[error(transparent)] GitHeadCommit(#[from] gix::reference::head_commit::Error),
     #[error(transparent)] GitOpen(#[from] gix::open::Error),
     #[error(transparent)] GitPeelReference(#[from] gix::reference::peel::to_kind::Error),
-    #[error(transparent)] Read(#[from] async_proto::ReadError),
+    #[error(transparent)] Read(#[from] ReadError),
     #[error(transparent)] Refresh(#[from] RefreshError),
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[error("failed to access user directories")]
@@ -327,17 +332,17 @@ impl Supervisor {
                             let mut stdout = child.stdout.take().expect("stdout was piped");
                             loop {
                                 select! {
-                                    res = PrepareStopUpdate::read(&mut stdout) => match res? {
-                                        PrepareStopUpdate::AcquiringMutex => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                    res = PrepareStopUpdate::read(&mut stdout) => match res {
+                                        Ok(PrepareStopUpdate::AcquiringMutex) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                                             let _ = status.watch.send(());
                                             status.future[idx].2 = CommitStatus::PrepareStopAcquiringMutex;
                                         }),
-                                        PrepareStopUpdate::WaitingForRooms(mut rooms) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                        Ok(PrepareStopUpdate::WaitingForRooms(mut rooms)) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                                             let _ = status.watch.send(());
                                             rooms.retain(|room| room.is_public());
                                             status.future[idx].2 = CommitStatus::WaitingForRooms { rooms };
                                         }),
-                                        PrepareStopUpdate::RoomOpened(room) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                        Ok(PrepareStopUpdate::RoomOpened(room)) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                                             if room.is_public() {
                                                 let _ = status.watch.send(());
                                                 if let CommitStatus::WaitingForRooms { rooms } = &mut status.future[idx].2 {
@@ -345,7 +350,7 @@ impl Supervisor {
                                                 }
                                             }
                                         }),
-                                        PrepareStopUpdate::RoomClosed(room) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                        Ok(PrepareStopUpdate::RoomClosed(room)) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                                             if room.is_public() {
                                                 let _ = status.watch.send(());
                                                 if let CommitStatus::WaitingForRooms { rooms } = &mut status.future[idx].2 {
@@ -353,6 +358,15 @@ impl Supervisor {
                                                 }
                                             }
                                         }),
+                                        Err(ReadError { kind: ReadErrorKind::EndOfStream, .. }) => {
+                                            child.check("midos-house prepare-stop").await?;
+                                            break
+                                        }
+                                        Err(ReadError { kind: ReadErrorKind::Io(e), .. }) if e.kind() == io::ErrorKind::UnexpectedEof => {
+                                            child.check("midos-house prepare-stop").await?;
+                                            break
+                                        }
+                                        Err(e) => return Err(e.into()),
                                     },
                                     res = (&mut child).check("midos-house prepare-stop") => {
                                         let _ = res?;
