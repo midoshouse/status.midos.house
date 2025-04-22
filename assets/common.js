@@ -123,3 +123,5 @@ function startWebsocket() {
         stateText.textContent = `Error checking for status updates: ${e}. Please report this error to Fenhl.`;
     }
 }
+
+startWebsocket();
