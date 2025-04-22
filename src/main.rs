@@ -96,8 +96,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         a(href = format!("https://github.com/midoshouse/midos.house/commit/{running}")) : running.to_hex_with_len(7).to_string();
                     }
                 }
-                p(id = "mh-future-empty", style? = future.is_empty().then_some("display: none;")) : "Mido's House is up to date.";
-                div(id = "mh-future-nonempty", style? = (!future.is_empty()).then_some("display: none;")) {
+                p(id = "mh-future-empty", style? = (!future.is_empty()).then_some("display: none;")) : "Mido's House is up to date.";
+                div(id = "mh-future-nonempty", style? = future.is_empty().then_some("display: none;")) {
                     p : "Pending updates:";
                     table {
                         thead {
@@ -175,8 +175,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{GIT_COMMIT_HASH}")) : GIT_COMMIT_HASH.to_hex_with_len(7).to_string();
                     }
                 }
-                p(id = "self-future-empty", style? = self_future.is_empty().then_some("display: none;")) : "status.midos.house is up to date.";
-                div(id = "self-future-nonempty", style? = (!self_future.is_empty()).then_some("display: none;")) {
+                p(id = "self-future-empty", style? = (!self_future.is_empty()).then_some("display: none;")) : "status.midos.house is up to date.";
+                div(id = "self-future-nonempty", style? = self_future.is_empty().then_some("display: none;")) {
                     p : "Pending updates:";
                     table {
                         thead {
