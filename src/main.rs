@@ -154,7 +154,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 p { //TODO determine server update status (major updates still need to be managed by release script to coordinate with client releases, but minor/patch/same-version updates could be managed by the supervisor)
                     : "Please see ";
                     a(href = "https://github.com/midoshouse/ootr-multiworld/commits/main") : "GitHub";
-                    : " for a ";
+                    : " for a list of pending updates";
                 }
                 div(class = "header") {
                     img(src = uri!(lens));
