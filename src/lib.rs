@@ -28,7 +28,10 @@ pub enum EventKind {
 #[derive(Clone, PartialEq, Eq, Hash, Protocol)]
 pub enum OpenRoom {
     Discord(RaceId, EventKind),
-    RaceTime(String),
+    RaceTime {
+        room_url: String,
+        public: bool,
+    },
 }
 
 impl OpenRoom {
@@ -40,7 +43,7 @@ impl OpenRoom {
                 EventKind::Async2 => "async 2 of ",
                 EventKind::Async3 => "async 3 of ",
             }),
-            Self::RaceTime(room_url) => format!("https://{racetime_host}{room_url}"),
+            Self::RaceTime { room_url, public: _ } => format!("https://{racetime_host}{room_url}"),
         }
     }
 }
