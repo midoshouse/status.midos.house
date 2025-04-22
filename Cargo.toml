@@ -21,6 +21,7 @@ warnings = "deny"
 [dependencies]
 async-proto = "0.25.1"
 base64 = "0.22.1"
+collect-mac = "0.1.0"
 dir-lock = "0.4.1"
 directories = "6.0.0"
 futures = "0.3.31"
@@ -31,6 +32,7 @@ log-lock = { git = "https://github.com/fenhl/log-lock", branch = "main" }
 mimalloc = "0.1.46"
 rocket = { version = "0.5.1", features = ["secrets"] }
 rocket-util = { git = "https://github.com/fenhl/rocket-util", branch = "main" }
+rocket_ws = "0.1.1"
 rust-crypto = "0.2.36"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }

@@ -31,4 +31,14 @@ server {
         root /opt/git/github.com/midoshouse/status.midos.house/main/assets;
         internal;
     }
+
+    location /websocket {
+        add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_pass http://localhost:24824;
+        proxy_read_timeout 300;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
 }

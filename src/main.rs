@@ -2,10 +2,12 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use {
+    std::collections::HashMap,
     base64::engine::{
         Engine as _,
         general_purpose::STANDARD as BASE64,
     },
+    collect_mac::collect,
     crypto::{
         hmac::Hmac,
         mac::Mac as _,
@@ -13,6 +15,7 @@ use {
     },
     futures::future::FutureExt as _,
     itermore::IterArrayChunks as _,
+    itertools::Itertools as _,
     rocket::{
         Rocket,
         State,
@@ -37,6 +40,9 @@ use {
         Doctype,
         html,
     },
+    rocket_ws::WebSocket,
+    serde_json::json,
+    tokio::select,
     url as _, // only used in lib
     wheel::traits::IoResultExt as _,
     crate::{
@@ -59,7 +65,7 @@ const MW_REPO_PATH: &str = "/opt/git/github.com/midoshouse/ootr-multiworld/main"
 #[rocket::get("/")]
 async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, supervisor::RefreshError> {
     supervisor.refresh(true, false).await?;
-    let supervisor::Status { ref running, ref future, ref self_future } = *supervisor.status().await;
+    let supervisor::Status { watch: _, ref running, ref future, ref self_future } = *supervisor.status().await;
     Ok(html! {
         : Doctype;
         html {
@@ -71,6 +77,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 style : RawHtml(include_str!("../assets/common.css"));
             }
             body {
+                p(id = "websocket-state") : "Please enable JavaScript to allow this page to update automatically, or refresh occasionally to see the current status.";
                 div(class = "header") {
                     div(class = "logo") {
                         img(class = "chest", src = uri!(chest));
@@ -85,13 +92,12 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 }
                 p {
                     : "Currently running: ";
-                    code {
+                    code(id = "mh-current") {
                         a(href = format!("https://github.com/midoshouse/midos.house/commit/{running}")) : running.to_hex_with_len(7).to_string();
                     }
                 }
-                @if future.is_empty() {
-                    p : "Mido's House is up to date.";
-                } else {
+                p(id = "mh-future-empty", style? = future.is_empty().then_some("display: none;")) : "Mido's House is up to date.";
+                div(id = "mh-future-nonempty", style? = (!future.is_empty()).then_some("display: none;")) {
                     p : "Pending updates:";
                     table {
                         thead {
@@ -101,7 +107,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                                 th : "Status";
                             }
                         }
-                        tbody {
+                        tbody(id = "mh-future-tbody") {
                             @for (commit_hash, commit_msg, status) in future {
                                 tr {
                                     td {
@@ -117,7 +123,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                                             CommitStatus::Build => : "building";
                                             CommitStatus::PrepareStopInit => : "waiting for reply to shutdown request";
                                             CommitStatus::PrepareStopAcquiringMutex => : "waiting for access to clean shutdown state";
-                                            CommitStatus::WaitingForRooms(rooms) => div(class = "favicon-container") {
+                                            CommitStatus::WaitingForRooms { rooms } => div(class = "favicon-container") {
                                                 : "waiting for ongoing races to stop:";
                                                 @if rooms.is_empty() {
                                                     : "(private async parts)";
@@ -147,7 +153,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                 p {
                     @let mw_commit_hash = gix::open(MW_REPO_PATH)?.head_commit()?.id;
                     : "Currently running: ";
-                    code {
+                    code(id = "mw-current") {
                         a(href = format!("https://github.com/midoshouse/ootr-multiworld/commit/{mw_commit_hash}")) : mw_commit_hash.to_hex_with_len(7).to_string();
                     }
                 }
@@ -169,9 +175,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{GIT_COMMIT_HASH}")) : GIT_COMMIT_HASH.to_hex_with_len(7).to_string();
                     }
                 }
-                @if self_future.is_empty() {
-                    p : "status.midos.house is up to date.";
-                } else {
+                p(id = "self-future-empty", style? = self_future.is_empty().then_some("display: none;")) : "status.midos.house is up to date.";
+                div(id = "self-future-nonempty", style? = (!self_future.is_empty()).then_some("display: none;")) {
                     p : "Pending updates:";
                     table {
                         thead {
@@ -181,7 +186,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                                 th : "Status";
                             }
                         }
-                        tbody {
+                        tbody(id = "self-future-tbody") {
                             @for (commit_hash, commit_msg, status) in self_future {
                                 tr {
                                     td {
@@ -202,9 +207,73 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, superv
                         }
                     }
                 }
+                script : RawHtml(include_str!("../assets/common.js"));
             }
         }
     })
+}
+
+#[rocket::get("/websocket")]
+async fn websocket(supervisor: &State<Supervisor>, ws: WebSocket, mut shutdown: rocket::Shutdown) -> rocket_ws::Stream![] {
+    let (mut running, mut future, mut self_future, mut watch) = {
+        let status = supervisor.status().await;
+        (status.running.clone(), status.future.clone(), status.self_future.clone(), status.watch.subscribe())
+    };
+    let supervisor = (**supervisor).clone();
+    rocket_ws::Stream! { ws =>
+        let _ = ws;
+        // repopulate page data with payload in case it changed in between the server-side page render and the WebSocket connection
+        yield rocket_ws::Message::Text(serde_json::to_string(&json!({
+            "type": "change",
+            "running": running.to_string(),
+            "future": future.iter().map(|(commit_hash, commit_msg, status)| json!({
+                "commitHash": commit_hash.to_string(),
+                "commitMsg": commit_msg,
+                "status": status,
+            })).collect_vec(),
+            "selfFuture": self_future.iter().map(|(commit_hash, commit_msg, status)| json!({
+                "commitHash": commit_hash.to_string(),
+                "commitMsg": commit_msg,
+                "status": status,
+            })).collect_vec(),
+        })).unwrap());
+        loop {
+            select! {
+                res = watch.changed() => {
+                    if res.is_err() { break }
+                    let status = supervisor.status().await;
+                    let mut payload = collect![as HashMap<_, _>: format!("type") => json!("change")];
+                    if status.running != running {
+                        payload.insert(format!("running"), json!(status.running.to_string()));
+                        running = status.running;
+                    }
+                    if status.future != future {
+                        payload.insert(format!("future"), json!(status.future.iter().map(|(commit_hash, commit_msg, status)| json!({
+                            "commitHash": commit_hash.to_string(),
+                            "commitMsg": commit_msg,
+                            "status": status,
+                        })).collect_vec()));
+                        future = status.future.clone();
+                    }
+                    if status.self_future != self_future {
+                        payload.insert(format!("selfFuture"), json!(status.self_future.iter().map(|(commit_hash, commit_msg, status)| json!({
+                            "commitHash": commit_hash.to_string(),
+                            "commitMsg": commit_msg,
+                            "status": status,
+                        })).collect_vec()));
+                        self_future = status.self_future.clone();
+                    }
+                    yield rocket_ws::Message::Text(serde_json::to_string(&payload).unwrap());
+                }
+                () = &mut shutdown => {
+                    yield rocket_ws::Message::Text(serde_json::to_string(&json!({
+                        "type": "refresh",
+                    })).unwrap());
+                    break
+                }
+            }
+        }
+    }
 }
 
 #[rocket::get("/chest.png")]
@@ -356,6 +425,7 @@ async fn main() -> Result<(), Error> {
     })
     .mount("/", rocket::routes![
         index,
+        websocket,
         chest,
         mw_logo,
         lens,

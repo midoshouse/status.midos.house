@@ -18,6 +18,7 @@ use {
         PrepareStopUpdate,
     },
     log_lock::*,
+    serde::Serialize,
     tokio::{
         process::Command,
         select,
@@ -51,21 +52,28 @@ fn rust_lock_dir() -> Cow<'static, Path> {
 }
 
 pub(crate) struct Status {
+    pub(crate) watch: watch::Sender<()>,
     pub(crate) running: gix::ObjectId,
     pub(crate) future: Vec<(gix::ObjectId, String, CommitStatus)>,
     pub(crate) self_future: Vec<(gix::ObjectId, String, SelfCommitStatus)>,
 }
 
+#[derive(Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum CommitStatus {
     Pending,
     Skipped,
     Build,
     PrepareStopInit,
     PrepareStopAcquiringMutex,
-    WaitingForRooms(HashSet<OpenRoom>),
+    WaitingForRooms {
+        rooms: HashSet<OpenRoom>,
+    },
     Deploy,
 }
 
+#[derive(Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum SelfCommitStatus {
     Pending,
     Skipped,
@@ -125,6 +133,7 @@ impl Supervisor {
             update: watch::Sender::new(running),
             self_update: watch::Sender::new(GIT_COMMIT_HASH),
             status: Arc::new(RwLock::new(Status {
+                watch: watch::Sender::default(),
                 running,
                 future: Vec::default(),
                 self_future: Vec::default(),
@@ -150,6 +159,7 @@ impl Supervisor {
             let repo = gix::open(BUILD_REPO_PATH)?;
             let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
             let needs_update = lock!(@write status = self.status; {
+                let _ = status.watch.send(());
                 let status_latest = status.future.last().map_or(status.running, |(latest, _, _)| *latest);
                 if new_head != status_latest {
                     let mut iter_commit = repo.find_commit(new_head)?;
@@ -198,6 +208,7 @@ impl Supervisor {
             let repo = gix::open(SELF_REPO_PATH)?;
             let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
             let needs_update = lock!(@write status = self.status; {
+                let _ = status.watch.send(());
                 let status_latest = status.self_future.last().map_or(GIT_COMMIT_HASH, |(latest, _, _)| *latest);
                 if new_head != status_latest {
                     let mut iter_commit = repo.find_commit(new_head)?;
@@ -267,6 +278,7 @@ impl Supervisor {
                         let new_head = gix::open(BUILD_REPO_PATH)?.head_commit()?.id;
                         if new_head != old_head {
                             lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                let _ = status.watch.send(());
                                 status.future[idx].2 = CommitStatus::Build;
                                 for idx in 0..idx {
                                     status.future[idx].2 = CommitStatus::Skipped;
@@ -305,6 +317,7 @@ impl Supervisor {
                         println!("supervisor: updating to {new_head}");
                         if Command::new("/usr/bin/systemctl").arg("is-active").arg("midos-house").status().await.at_command("systemctl is-active")?.success() {
                             lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                let _ = status.watch.send(());
                                 status.future[idx].2 = CommitStatus::PrepareStopInit;
                             });
                             // intentionally not checking exit status as prepare-stop crashing is also a good reason to restart Mido's House
@@ -316,22 +329,26 @@ impl Supervisor {
                                 select! {
                                     res = PrepareStopUpdate::read(&mut stdout) => match res? {
                                         PrepareStopUpdate::AcquiringMutex => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                            let _ = status.watch.send(());
                                             status.future[idx].2 = CommitStatus::PrepareStopAcquiringMutex;
                                         }),
                                         PrepareStopUpdate::WaitingForRooms(mut rooms) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                            let _ = status.watch.send(());
                                             rooms.retain(|room| room.is_public());
-                                            status.future[idx].2 = CommitStatus::WaitingForRooms(rooms);
+                                            status.future[idx].2 = CommitStatus::WaitingForRooms { rooms };
                                         }),
                                         PrepareStopUpdate::RoomOpened(room) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                                             if room.is_public() {
-                                                if let CommitStatus::WaitingForRooms(rooms) = &mut status.future[idx].2 {
+                                                let _ = status.watch.send(());
+                                                if let CommitStatus::WaitingForRooms { rooms } = &mut status.future[idx].2 {
                                                     rooms.insert(room);
                                                 }
                                             }
                                         }),
                                         PrepareStopUpdate::RoomClosed(room) => lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                                             if room.is_public() {
-                                                if let CommitStatus::WaitingForRooms(rooms) = &mut status.future[idx].2 {
+                                                let _ = status.watch.send(());
+                                                if let CommitStatus::WaitingForRooms { rooms } = &mut status.future[idx].2 {
                                                     rooms.remove(&room);
                                                 }
                                             }
@@ -345,6 +362,7 @@ impl Supervisor {
                             }
                         }
                         lock!(@write status = self.status; if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                            let _ = status.watch.send(());
                             status.future[idx].2 = CommitStatus::Deploy;
                         });
                         println!("supervisor: stopping old version");
@@ -359,6 +377,7 @@ impl Supervisor {
                         Command::new("sudo").arg("/usr/bin/systemctl").arg("start").arg("midos-house").check("systemctl start").await?;
                         println!("supervisor: update completed");
                         lock!(@write status = self.status; {
+                            let _ = status.watch.send(());
                             status.running = new_head;
                             if let Some(idx) = status.future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
                                 status.future.drain(..=idx);
@@ -377,6 +396,7 @@ impl Supervisor {
                         let new_head = gix::open(SELF_REPO_PATH)?.head_commit()?.id;
                         if new_head != old_head {
                             lock!(@write status = self.status; if let Some(idx) = status.self_future.iter().position(|(iter_commit, _, _)| *iter_commit == new_head) {
+                                let _ = status.watch.send(());
                                 status.self_future[idx].2 = SelfCommitStatus::Build;
                                 for idx in 0..idx {
                                     status.self_future[idx].2 = SelfCommitStatus::Skipped;

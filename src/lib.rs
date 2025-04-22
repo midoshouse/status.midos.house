@@ -6,6 +6,7 @@ use {
         fmt,
     },
     async_proto::Protocol,
+    serde::Serialize,
     url::Url,
 };
 
@@ -26,9 +27,15 @@ pub enum EventKind {
     Async3,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Protocol)]
+#[derive(Clone, PartialEq, Eq, Hash, Protocol, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum OpenRoom {
-    Discord(RaceId, EventKind),
+    #[serde(skip)]
+    Discord {
+        id: RaceId,
+        kind: EventKind,
+    },
+    #[serde(rename_all = "camelCase")]
     RaceTime {
         room_url: String,
         public: bool,
@@ -38,14 +45,14 @@ pub enum OpenRoom {
 impl OpenRoom {
     pub fn is_public(&self) -> bool {
         match self {
-            Self::Discord(..) => false,
+            Self::Discord { .. } => false,
             Self::RaceTime { public, .. } => *public,
         }
     }
 
     pub fn public_url(&self, racetime_host: &'static str) -> Option<Url> {
         match self {
-            Self::Discord(..) => None,
+            Self::Discord { .. } => None,
             Self::RaceTime { room_url, public } => if *public {
                 Some(format!("https://{racetime_host}{room_url}").parse().unwrap())
             } else {
@@ -56,7 +63,7 @@ impl OpenRoom {
 
     pub fn to_string(&self, racetime_host: &'static str) -> String {
         match self {
-            Self::Discord(race_id, kind) => format!("Discord race handler for {}race {race_id}", match kind {
+            Self::Discord { id, kind } => format!("Discord race handler for {}race {id}", match kind {
                 EventKind::Normal => "",
                 EventKind::Async1 => "async 1 of ",
                 EventKind::Async2 => "async 2 of ",
