@@ -67,6 +67,7 @@ function startWebsocket() {
                                         }
                                         case 'deploy': statusCell.appendChild(document.createTextNode('deploying')); break;
                                     }
+                                    row.appendChild(statusCell);
                                     return row;
                                 });
                             document.getElementById('mh-future-tbody').replaceChildren(...futureChildren);
@@ -97,6 +98,7 @@ function startWebsocket() {
                                         case 'skipped': statusCell.appendChild(document.createTextNode('skipped')); break;
                                         case 'build': statusCell.appendChild(document.createTextNode('building')); break;
                                     }
+                                    row.appendChild(statusCell);
                                     return row;
                                 });
                             document.getElementById('self-future-tbody').replaceChildren(...selfFutureChildren);
