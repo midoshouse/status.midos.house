@@ -46,6 +46,7 @@ function startWebsocket() {
                                         case 'waitingForRooms': {
                                             const faviconContainer = document.createElement('div');
                                             faviconContainer.setAttribute('class', 'favicon-container');
+                                            faviconContainer.appendChild(document.createTextNode('waiting for ongoing races to stop:'));
                                             if (commit.status.rooms.length == 0) {
                                                 faviconContainer.appendChild(document.createTextNode('(private async parts)'));
                                             } else {
