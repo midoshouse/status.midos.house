@@ -25,7 +25,8 @@ collect-mac = "0.1.0"
 dir-lock = "0.4.1"
 directories = "6.0.0"
 futures = "0.3.31"
-gix = "0.71.0"
+gix = "0.72"
+hmac = "0.12.1"
 itermore = { version = "0.7.1", features = ["array_chunks"] }
 itertools = "0.14.0"
 log-lock = { git = "https://github.com/fenhl/log-lock", branch = "main" }
@@ -33,9 +34,9 @@ mimalloc = "0.1.46"
 rocket = { version = "0.5.1", features = ["secrets"] }
 rocket-util = { git = "https://github.com/fenhl/rocket-util", branch = "main" }
 rocket_ws = "0.1.1"
-rust-crypto = "0.2.36"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
+sha2 = "0.10.8"
 thiserror = "2.0.12"
 tokio = { version = "1.44.2", features = ["process", "sync", "time"] }
 url = "2.5.4"
@@ -46,5 +47,5 @@ which = "7.0.3"
 xdg = "2.5.2"
 
 [build-dependencies]
-gix = "0.71.0"
+gix = "0.72"
 itertools = "0.14.0"

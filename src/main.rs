@@ -8,12 +8,11 @@ use {
         general_purpose::STANDARD as BASE64,
     },
     collect_mac::collect,
-    crypto::{
-        hmac::Hmac,
-        mac::Mac as _,
-        sha2::Sha256,
-    },
     futures::future::FutureExt as _,
+    hmac::{
+        Hmac,
+        Mac as _,
+    },
     itermore::IterArrayChunks as _,
     itertools::Itertools as _,
     rocket::{
@@ -42,6 +41,7 @@ use {
     },
     rocket_ws::WebSocket,
     serde_json::json,
+    sha2::Sha256,
     tokio::select,
     url as _, // only used in lib
     wheel::traits::IoResultExt as _,
@@ -308,13 +308,11 @@ macro_rules! guard_try {
 struct SignedPayload(String);
 
 fn is_valid_signature(signature: &str, body: &str, secret: &str) -> bool {
-    let digest = Sha256::new();
-    let mut hmac = Hmac::new(digest, secret.as_bytes());
-    hmac.input(body.as_bytes());
-    let expected_signature = hmac.result();
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
+    mac.update(body.as_bytes());
     let Some((prefix, code)) = signature.split_once('=') else { return false };
     let Ok(code) = code.chars().arrays().map(|[c1, c2]| u8::from_str_radix(&format!("{c1}{c2}"), 16)).collect::<Result<Vec<_>, _>>() else { return false };
-    prefix == "sha256" && crypto::util::fixed_time_eq(expected_signature.code(), &code)
+    prefix == "sha256" && mac.verify_slice(&code).is_ok()
 }
 
 #[test]
