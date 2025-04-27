@@ -6,6 +6,7 @@ use {
         fmt,
     },
     async_proto::Protocol,
+    derivative::Derivative,
     serde::Serialize,
     url::Url,
 };
@@ -27,7 +28,8 @@ pub enum EventKind {
     Async3,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Protocol, Serialize)]
+#[derive(Derivative, Clone, Protocol, Serialize)]
+#[derivative(PartialEq, Eq, Hash)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum OpenRoom {
     #[serde(skip)]
@@ -38,6 +40,7 @@ pub enum OpenRoom {
     #[serde(rename_all = "camelCase")]
     RaceTime {
         room_url: String,
+        #[derivative(PartialEq = "ignore", Hash = "ignore")]
         public: bool,
     },
 }

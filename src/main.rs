@@ -8,6 +8,7 @@ use {
         general_purpose::STANDARD as BASE64,
     },
     collect_mac::collect,
+    derivative as _, // only used in lib
     futures::future::FutureExt as _,
     hmac::{
         Hmac,

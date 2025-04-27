@@ -2563,6 +2563,7 @@ dependencies = [
  "async-proto",
  "base64 0.22.1",
  "collect-mac",
+ "derivative",
  "dir-lock",
  "directories",
  "futures",
