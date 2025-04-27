@@ -325,7 +325,6 @@ impl Supervisor {
                                 let _ = status.watch.send(());
                                 status.future[idx].2 = CommitStatus::PrepareStopInit;
                             });
-                            // intentionally not checking exit status as prepare-stop crashing is also a good reason to restart Mido's House
                             //TODO allow building newer commits during prepare-stop
                             println!("supervisor: preparing to stop");
                             let mut child = Command::new(BIN_PATH).arg("prepare-stop").arg("--async-proto").stdout(Stdio::piped()).spawn().at_command("midos-house prepare-stop")?;
@@ -359,11 +358,13 @@ impl Supervisor {
                                             }
                                         }),
                                         Err(ReadError { kind: ReadErrorKind::EndOfStream, .. }) => {
-                                            child.check("midos-house prepare-stop").await?;
+                                            // intentionally not checking exit status as prepare-stop crashing is also a good reason to restart Mido's House
+                                            child.wait().await.at_command("midos-house prepare-stop")?;
                                             break
                                         }
                                         Err(ReadError { kind: ReadErrorKind::Io(e), .. }) if e.kind() == io::ErrorKind::UnexpectedEof => {
-                                            child.check("midos-house prepare-stop").await?;
+                                            // intentionally not checking exit status as prepare-stop crashing is also a good reason to restart Mido's House
+                                            child.wait().await.at_command("midos-house prepare-stop")?;
                                             break
                                         }
                                         Err(e) => return Err(e.into()),
