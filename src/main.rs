@@ -62,9 +62,14 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 const MW_REPO_PATH: &str = "/opt/git/github.com/midoshouse/ootr-multiworld/main";
 
+#[derive(Debug, thiserror::Error, rocket_util::Error)]
+enum IndexError {
+    #[error(transparent)] GitHeadCommit(#[from] gix::reference::head_commit::Error),
+    #[error(transparent)] GitOpen(#[from] gix::open::Error),
+}
+
 #[rocket::get("/")]
-async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, supervisor::RefreshError> {
-    supervisor.refresh(true, false).await?;
+async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexError> {
     let supervisor::Status { watch: _, ref running, ref future, ref self_future } = *supervisor.status().await;
     Ok(html! {
         : Doctype;
