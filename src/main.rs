@@ -62,6 +62,7 @@ mod supervisor;
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 const MW_REPO_PATH: &str = "/opt/git/github.com/midoshouse/ootr-multiworld/main";
+const TRACKER_REPO_PATH: &str = "/opt/git/github.com/fenhl/oottracker/branch/mw";
 
 #[derive(Debug, thiserror::Error, rocket_util::Error)]
 enum IndexError {
@@ -213,6 +214,25 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                         }
                     }
                 }
+                div(class = "header") {
+                    img(src = uri!(tracker_logo));
+                    div(class = "header-text") {
+                        h1 : "OoT Tracker";
+                        div(class = "subtitle") : "website for multiworld restream auto-tracking";
+                    }
+                }
+                p {
+                    @let tracker_commit_hash = gix::open(TRACKER_REPO_PATH)?.head_commit()?.id;
+                    : "Currently running: ";
+                    code(id = "tracker-current") {
+                        a(href = format!("https://github.com/fenhl/oottracker/commit/{tracker_commit_hash}")) : tracker_commit_hash.to_hex_with_len(7).to_string();
+                    }
+                }
+                p { //TODO determine server update status and auto-update when no multiworld tracker rooms are open
+                    : "Please see ";
+                    a(href = "https://github.com/fenhl/oottracker/commits/mw") : "GitHub";
+                    : " for a list of pending updates.";
+                }
                 script : RawHtml(include_str!("../assets/common.js"));
             }
         }
@@ -295,6 +315,11 @@ fn mw_logo() -> (ContentType, &'static [u8]) {
 #[rocket::get("/lens.svg")]
 fn lens() -> (ContentType, &'static [u8]) {
     (ContentType::SVG, include_bytes!("../assets/lens.svg"))
+}
+
+#[rocket::get("/tracker.png")]
+fn tracker_logo() -> (ContentType, &'static [u8]) {
+    (ContentType::PNG, include_bytes!("../assets/tracker.png"))
 }
 
 #[rocket::get("/racetime.svg")]
@@ -433,6 +458,7 @@ async fn main() -> Result<(), Error> {
         chest,
         mw_logo,
         lens,
+        tracker_logo,
         racetime_logo,
         github_webhook,
     ])
