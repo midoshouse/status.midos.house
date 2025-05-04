@@ -89,8 +89,6 @@ pub(crate) enum SelfCommitStatus {
 pub(crate) struct Supervisor {
     build_repo_lock: Arc<Mutex<Instant>>,
     self_repo_lock: Arc<Mutex<Instant>>,
-    update: watch::Sender<gix::ObjectId>,
-    self_update: watch::Sender<gix::ObjectId>,
     status: Arc<RwLock<Status>>,
 }
 
@@ -135,8 +133,6 @@ impl Supervisor {
         Ok(Self {
             build_repo_lock: Arc::new(Mutex::new(Instant::now())),
             self_repo_lock: Arc::new(Mutex::new(Instant::now())),
-            update: watch::Sender::new(running),
-            self_update: watch::Sender::new(GIT_COMMIT_HASH),
             status: Arc::new(RwLock::new(Status {
                 watch: watch::Sender::default(),
                 running,
@@ -163,7 +159,7 @@ impl Supervisor {
             Command::new("git").arg("fetch").current_dir(BUILD_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
             let repo = gix::open(BUILD_REPO_PATH)?;
             let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
-            let needs_update = lock!(@write status = self.status; {
+            lock!(@write status = self.status; {
                 let _ = status.watch.send(());
                 let status_latest = status.future.last().map_or(status.running, |(latest, _, _)| *latest);
                 if new_head != status_latest {
@@ -180,15 +176,10 @@ impl Supervisor {
                     }
                     status.future.extend(to_add.into_iter().rev().map(|(commit_hash, commit_msg)| (commit_hash, commit_msg, CommitStatus::Pending)));
                     println!("refresh: updating from {status_latest} to {new_head}");
-                    true
                 } else {
                     println!("refresh: already up to date at {status_latest}");
-                    false
                 }
             });
-            if needs_update {
-                self.update.send_replace(new_head);
-            }
         } else {
             println!("refresh: rate limited");
         }
@@ -212,7 +203,7 @@ impl Supervisor {
             Command::new("git").arg("fetch").current_dir(SELF_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
             let repo = gix::open(SELF_REPO_PATH)?;
             let new_head = repo.find_reference("origin/main")?.peel_to_commit()?.id;
-            let needs_update = lock!(@write status = self.status; {
+            lock!(@write status = self.status; {
                 let _ = status.watch.send(());
                 let status_latest = status.self_future.last().map_or(GIT_COMMIT_HASH, |(latest, _, _)| *latest);
                 if new_head != status_latest {
@@ -229,15 +220,10 @@ impl Supervisor {
                     }
                     status.self_future.extend(to_add.into_iter().rev().map(|(commit_hash, commit_msg)| (commit_hash, commit_msg, SelfCommitStatus::Pending)));
                     println!("refresh: updating self from {status_latest} to {new_head}");
-                    true
                 } else {
                     println!("refresh: self already up to date at {status_latest}");
-                    false
                 }
             });
-            if needs_update {
-                self.self_update.send_replace(new_head);
-            }
         } else {
             println!("refresh: rate limited");
         }
@@ -258,11 +244,9 @@ impl Supervisor {
         println!("supervisor: initializing");
         let user_dirs = UserDirs::new().ok_or(RunError::UserDirs)?;
         let next_path = user_dirs.home_dir().join("bin").join("midos-house-next");
-        let mut update = self.update.subscribe();
+        let mut update = self.status().await.watch.subscribe();
         self.refresh(false, true).await?;
         update.mark_changed();
-        let mut self_update = self.self_update.subscribe();
-        self_update.mark_changed();
         loop {
             println!("supervisor: waiting for events");
             select! {
@@ -271,7 +255,7 @@ impl Supervisor {
                     break
                 }
                 () = sleep(Duration::from_secs(24 * 60 * 60)) => {
-                    println!("supervisor: no events after 1 hour, requesting refresh");
+                    println!("supervisor: no events after 1 day, requesting refresh");
                     self.refresh(true, true).await?;
                 }
                 res = update.changed() => {
@@ -401,10 +385,6 @@ impl Supervisor {
                     } else {
                         println!("supervisor: no update needed");
                     }
-                }
-                res = self_update.changed() => {
-                    println!("supervisor: got self-update notification");
-                    let () = res.expect("all self-update senders dropped");
                     let old_head = GIT_COMMIT_HASH;
                     let needs_update = lock!(last_refresh = self.self_repo_lock; {
                         Command::new("git").arg("pull").current_dir(SELF_REPO_PATH).check("git pull").await?; //TODO use gix (how?)
