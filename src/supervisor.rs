@@ -382,7 +382,6 @@ impl Supervisor {
                         Command::new("git").arg("fetch").current_dir(LIVE_REPO_PATH).check("git fetch").await?;
                         Command::new("git").arg("reset").arg("--hard").arg(built_commit.to_string()).current_dir(LIVE_REPO_PATH).check("git reset").await?;
                         println!("supervisor: replacing binary");
-                        Command::new("chmod").arg("+x").arg(&next_path).check("chmod").await?;
                         fs::rename(&next_path, BIN_PATH).await?;
                         println!("supervisor: starting new version");
                         Command::new("sudo").arg("/usr/bin/systemctl").arg("start").arg("midos-house").check("systemctl start").await?;
@@ -503,6 +502,7 @@ impl Supervisor {
                     println!("supervisor: building {new_head}");
                     Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("build").arg("--release").arg("--target=x86_64-unknown-linux-musl").current_dir(BUILD_REPO_PATH).kill_on_drop(true).check("cargo build").await?;
                     fs::rename(Path::new(BUILD_REPO_PATH).join("target").join("x86_64-unknown-linux-musl").join("release").join("midos-house"), &next_path).await?;
+                    Command::new("chmod").arg("+x").arg(&next_path).check("chmod").await?;
                     Ok(new_head)
                 }))
             } else {
