@@ -1,11 +1,16 @@
 const stateText = document.getElementById('websocket-state');
 
+function setState(state) {
+    console.log(state);
+    stateText.textContent = state;
+}
+
 function startWebsocket() {
     try {
-        stateText.textContent = 'Connecting for automatic status updates…';
+        setState('Connecting for automatic status updates…');
         const sock = new WebSocket("wss://status.midos.house/websocket");
         sock.onopen = () => {
-            stateText.textContent = 'Status is updating live.';
+            setState('Status is updating live.');
         };
         sock.onmessage = (event) => {
             const payload = JSON.parse(event.data);
@@ -123,14 +128,15 @@ function startWebsocket() {
             }
         };
         sock.onerror = (event) => {
+            console.log(`WebSocket error: ${event}`);
             throw event;
         }
         sock.onclose = () => {
-            stateText.textContent = 'Connection for automatic status updates lost, reconnecting…';
+            setState('Connection for automatic status updates lost, reconnecting…');
             setTimeout(startWebsocket, 1000);
         }
     } catch (e) {
-        stateText.textContent = `Error checking for status updates: ${e}. Please report this error to Fenhl.`;
+        setState(`Error checking for status updates: ${e}. Please report this error to Fenhl.`);
     }
 }
 
