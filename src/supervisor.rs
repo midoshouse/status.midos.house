@@ -222,8 +222,13 @@ impl Supervisor {
         let mut self_build_task = this.self_build_task(&user_dirs).await;
         let mut needs_rebuild = false;
         let mut needs_self_rebuild = false;
-        let mut prepare_stop_child = None::<tokio::process::Child>;
-        let mut prepare_stop_read = future::pending().boxed();
+        let (mut prepare_stop_child, mut prepare_stop_read) = if built_commit == running {
+            (None, future::pending().boxed())
+        } else {
+            let mut child = Command::new(BIN_PATH).arg("prepare-stop").arg("--async-proto").stdout(Stdio::piped()).spawn().at_command("midos-house prepare-stop")?;
+            let prepare_stop_read = PrepareStopUpdate::read_owned(child.stdout.take().expect("stdout was piped"));
+            (Some(child), prepare_stop_read)
+        };
         let mut needs_self_restart = false;
         Ok((this.clone(), move |mut shutdown: rocket::Shutdown| async move {
             loop {
