@@ -102,6 +102,7 @@ function startWebsocket() {
                                         case 'pending': statusCell.appendChild(document.createTextNode('waiting for other builds to finish')); break;
                                         case 'skipped': statusCell.appendChild(document.createTextNode('skipped')); break;
                                         case 'build': statusCell.appendChild(document.createTextNode('building')); break;
+                                        case 'waitRestart': statusCell.appendChild(document.createTextNode('waiting for other builds to finish')); break; //TODO distinguish from pending?
                                     }
                                     row.appendChild(statusCell);
                                     return row;

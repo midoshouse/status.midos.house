@@ -30,6 +30,7 @@ gix = "0.72"
 hmac = "0.12.1"
 itermore = { version = "0.7.1", features = ["array_chunks"] }
 itertools = "0.14.0"
+lazy-regex = "3.4.1"
 log-lock = { git = "https://github.com/fenhl/log-lock", branch = "main" }
 mimalloc = "0.1.46"
 rocket = { version = "0.5.1", features = ["secrets"] }

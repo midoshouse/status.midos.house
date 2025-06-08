@@ -41,6 +41,7 @@ use {
         html,
     },
     rocket_ws::WebSocket,
+    serde::Deserialize,
     serde_json::json,
     sha2::Sha256,
     tokio::select,
@@ -50,6 +51,7 @@ use {
         config::Config,
         supervisor::{
             CommitStatus,
+            RepoName,
             SelfCommitStatus,
             Supervisor,
         },
@@ -207,6 +209,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                                             SelfCommitStatus::Pending => : "waiting for other builds to finish";
                                             SelfCommitStatus::Skipped => : "skipped";
                                             SelfCommitStatus::Build => : "building";
+                                            SelfCommitStatus::WaitRestart => : "waiting for other builds to finish"; //TODO distinguish from Pending?
                                         }
                                     }
                                 }
@@ -392,17 +395,20 @@ impl<'r> FromData<'r> for SignedPayload {
 }
 
 #[rocket::post("/github-webhook", data = "<payload>")]
-fn github_webhook(supervisor: &State<Supervisor>, payload: SignedPayload) {
-    let _ = payload.0; // the data guard has verified that the request came from GitHub and we've only configured the webhook for push events for the midos.house repo for now
-    let supervisor = (*supervisor).clone();
-    tokio::spawn(async move {
-        match supervisor.refresh(false, true).await {
-            Ok(()) => {}
-            Err(e) => {
-                let _ = wheel::night_report("/net/midoshouse/status/error", Some(&format!("refresh failed: {e} ({e:?})"))).await;
-            }
-        }
-    });
+async fn github_webhook(supervisor: &State<Supervisor>, payload: SignedPayload) -> Result<(), rocket_util::Error<serde_json::Error>> {
+    #[derive(Deserialize)]
+    struct GithubWebhook {
+        repository: Repo,
+    }
+
+    #[derive(Deserialize)]
+    struct Repo {
+        name: RepoName,
+    }
+
+    let GithubWebhook { repository: Repo { name } } = serde_json::from_str(&payload.0)?;
+    supervisor.handle_webhook(name).await;
+    Ok(())
 }
 
 #[rocket::catch(404)]
@@ -427,8 +433,7 @@ enum Error {
     #[error(transparent)] Base64(#[from] base64::DecodeError),
     #[error(transparent)] Json(#[from] serde_json::Error),
     #[error(transparent)] Rocket(#[from] rocket::Error),
-    #[error(transparent)] SupervisorNew(#[from] supervisor::NewError),
-    #[error(transparent)] SupervisorRun(#[from] supervisor::RunError),
+    #[error(transparent)] Supervisor(#[from] supervisor::Error),
     #[error(transparent)] Task(#[from] tokio::task::JoinError),
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[cfg(unix)] #[error(transparent)] Xdg(#[from] xdg::BaseDirectoriesError),
@@ -445,7 +450,7 @@ async fn main() -> Result<(), Error> {
         default_panic_hook(info)
     }));
     let config = Config::load().await?;
-    let supervisor = Supervisor::new()?;
+    let (supervisor, run_supervisor) = Supervisor::new().await?;
     let rocket = rocket::custom(rocket::Config {
         secret_key: SecretKey::from(&BASE64.decode(&config.secret_key)?),
         log_level: rocket::config::LogLevel::Critical,
@@ -476,7 +481,7 @@ async fn main() -> Result<(), Error> {
         Ok(Err(e)) => Err(Error::from(e)),
         Err(e) => Err(Error::from(e)),
     });
-    let supervisor_task = tokio::spawn(supervisor.run(shutdown)).map(|res| match res {
+    let supervisor_task = tokio::spawn(run_supervisor(shutdown)).map(|res| match res {
         Ok(Ok(())) => Ok(()),
         Ok(Err(e)) => Err(Error::from(e)),
         Err(e) => Err(Error::from(e)),
