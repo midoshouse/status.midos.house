@@ -15,6 +15,9 @@ function startWebsocket() {
         sock.onmessage = (event) => {
             const payload = JSON.parse(event.data);
             switch (payload.type) {
+                case 'ping': {
+                    break;
+                }
                 case 'change': {
                     if ('running' in payload) {
                         const mhCurrent = document.createElement('a');

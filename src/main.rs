@@ -2,7 +2,10 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use {
-    std::collections::HashMap,
+    std::{
+        collections::HashMap,
+        time::Duration,
+    },
     base64::engine::{
         Engine as _,
         general_purpose::STANDARD as BASE64,
@@ -44,7 +47,10 @@ use {
     serde::Deserialize,
     serde_json::json,
     sha2::Sha256,
-    tokio::select,
+    tokio::{
+        select,
+        time::sleep,
+    },
     url as _, // only used in lib
     wheel::traits::IoResultExt as _,
     crate::{
@@ -268,6 +274,11 @@ async fn websocket(supervisor: &State<Supervisor>, ws: WebSocket, mut shutdown: 
         })).unwrap());
         loop {
             select! {
+                () = sleep(Duration::from_secs(30)) => {
+                    yield rocket_ws::Message::Text(serde_json::to_string(&json!({
+                        "type": "ping",
+                    })).unwrap());
+                }
                 res = watch.changed() => {
                     if res.is_err() { break }
                     let status = supervisor.status().await;
