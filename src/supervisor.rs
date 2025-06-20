@@ -278,6 +278,7 @@ impl Supervisor {
                     },
                     res = build_task_or_pending => {
                         built_commit = res??;
+                        println!("supervisor: build finished");
                         lock!(@write status = this.status; {
                             let _ = status.watch.send(());
                             if let Ok(built_idx) = status.future.binary_search_by_key(&built_commit, |(commit_hash, _, _)| *commit_hash) {
