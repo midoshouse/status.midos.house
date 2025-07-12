@@ -171,8 +171,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                         div(class = "subtitle") : "default room server";
                     }
                 }
+                @let mw_commit_hash = gix::open(MW_REPO_PATH)?.head_commit()?.id;
                 p {
-                    @let mw_commit_hash = gix::open(MW_REPO_PATH)?.head_commit()?.id;
                     : "Currently running: ";
                     code(id = "mw-current") {
                         a(href = format!("https://github.com/midoshouse/ootr-multiworld/commit/{mw_commit_hash}")) : mw_commit_hash.to_hex_with_len(7).to_string();
@@ -180,7 +180,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                 }
                 p { //TODO determine server update status (major updates still need to be managed by release script to coordinate with client releases, but minor/patch/same-version updates could be managed by the supervisor)
                     : "Please see ";
-                    a(href = "https://github.com/midoshouse/ootr-multiworld/commits/main") : "GitHub";
+                    a(href = format!("https://github.com/midoshouse/ootr-multiworld/compare/{mw_commit_hash}...main")) : "GitHub";
                     : " for a list of pending updates.";
                 }
                 div(class = "header") {
@@ -236,8 +236,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                         div(class = "subtitle") : "website for multiworld restream auto-tracking";
                     }
                 }
+                @let tracker_commit_hash = gix::open(TRACKER_REPO_PATH)?.head_commit()?.id;
                 p {
-                    @let tracker_commit_hash = gix::open(TRACKER_REPO_PATH)?.head_commit()?.id;
                     : "Currently running: ";
                     code(id = "tracker-current") {
                         a(href = format!("https://github.com/fenhl/oottracker/commit/{tracker_commit_hash}")) : tracker_commit_hash.to_hex_with_len(7).to_string();
@@ -245,7 +245,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                 }
                 p { //TODO determine server update status and auto-update when no multiworld tracker rooms are open
                     : "Please see ";
-                    a(href = "https://github.com/fenhl/oottracker/commits/mw") : "GitHub";
+                    a(href = format!("https://github.com/fenhl/oottracker/compare/{tracker_commit_hash}...mw")) : "GitHub";
                     : " for a list of pending updates.";
                 }
                 script : RawHtml(include_str!("../assets/common.js"));
