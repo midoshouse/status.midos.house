@@ -63,9 +63,15 @@ use {
         },
     },
 };
+#[cfg(unix)] use {
+    async_proto::Protocol as _,
+    tokio::net::UnixStream,
+    crate::unix_socket::Subcommand,
+};
 
 mod config;
 mod supervisor;
+#[cfg(unix)] mod unix_socket;
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
@@ -439,14 +445,26 @@ async fn fallback_catcher(status: Status, _: &Request<'_>) -> wheel::Result<Stri
     Ok(format!("Error {}: {}\nSorry, something went wrong. Please notify Fenhl on Discord.", status.code, status.reason_lossy()))
 }
 
+#[cfg(not(unix))]
+#[derive(clap::Subcommand)]
+enum Subcommand {}
+
+#[derive(clap::Parser)]
+struct Args {
+    #[clap(subcommand)]
+    subcommand: Option<Subcommand>,
+}
+
 #[derive(Debug, thiserror::Error)]
 enum Error {
     #[error(transparent)] Base64(#[from] base64::DecodeError),
     #[error(transparent)] Json(#[from] serde_json::Error),
+    #[cfg(unix)] #[error(transparent)] Read(#[from] async_proto::ReadError),
     #[error(transparent)] Rocket(#[from] rocket::Error),
     #[error(transparent)] Supervisor(#[from] supervisor::Error),
     #[error(transparent)] Task(#[from] tokio::task::JoinError),
     #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[cfg(unix)] #[error(transparent)] Write(#[from] async_proto::WriteError),
     #[cfg(unix)] #[error(transparent)] Xdg(#[from] xdg::BaseDirectoriesError),
     #[cfg(unix)]
     #[error("missing config file")]
@@ -454,49 +472,59 @@ enum Error {
 }
 
 #[wheel::main(rocket)]
-async fn main() -> Result<(), Error> {
-    let default_panic_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = wheel::night_report_sync("/net/midoshouse/status/error", Some("thread panic"));
-        default_panic_hook(info)
-    }));
-    let config = Config::load().await?;
-    let (supervisor, run_supervisor) = Supervisor::new().await?;
-    let rocket = rocket::custom(rocket::Config {
-        secret_key: SecretKey::from(&BASE64.decode(&config.secret_key)?),
-        log_level: rocket::config::LogLevel::Critical,
-        port: 24824,
-        ..rocket::Config::default()
-    })
-    .mount("/", rocket::routes![
-        index,
-        websocket,
-        chest,
-        mw_logo,
-        lens,
-        tracker_logo,
-        racetime_logo,
-        github_webhook,
-    ])
-    .register("/", rocket::catchers![
-        not_found,
-        internal_server_error,
-        fallback_catcher,
-    ])
-    .manage(config)
-    .manage(supervisor.clone())
-    .ignite().await?;
-    let shutdown = rocket.shutdown();
-    let rocket_task = tokio::spawn(rocket.launch()).map(|res| match res {
-        Ok(Ok(Rocket { .. })) => Ok(()),
-        Ok(Err(e)) => Err(Error::from(e)),
-        Err(e) => Err(Error::from(e)),
-    });
-    let supervisor_task = tokio::spawn(run_supervisor(shutdown)).map(|res| match res {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(Error::from(e)),
-        Err(e) => Err(Error::from(e)),
-    });
-    let ((), ()) = tokio::try_join!(rocket_task, supervisor_task)?;
+async fn main(Args { subcommand }: Args) -> Result<(), Error> {
+    if let Some(subcommand) = subcommand {
+        #[cfg(unix)] let mut sock = UnixStream::connect(unix_socket::PATH).await.at_unknown()?;
+        #[cfg(unix)] subcommand.write(&mut sock).await?;
+        match subcommand {
+            #[cfg(unix)] Subcommand::BuildMw => {
+                u8::read(&mut sock).await?;
+            }
+        }
+    } else {
+        let default_panic_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let _ = wheel::night_report_sync("/net/midoshouse/status/error", Some("thread panic"));
+            default_panic_hook(info)
+        }));
+        let config = Config::load().await?;
+        let (supervisor, run_supervisor) = Supervisor::new().await?;
+        let rocket = rocket::custom(rocket::Config {
+            secret_key: SecretKey::from(&BASE64.decode(&config.secret_key)?),
+            log_level: rocket::config::LogLevel::Critical,
+            port: 24824,
+            ..rocket::Config::default()
+        })
+        .mount("/", rocket::routes![
+            index,
+            websocket,
+            chest,
+            mw_logo,
+            lens,
+            tracker_logo,
+            racetime_logo,
+            github_webhook,
+        ])
+        .register("/", rocket::catchers![
+            not_found,
+            internal_server_error,
+            fallback_catcher,
+        ])
+        .manage(config)
+        .manage(supervisor.clone())
+        .ignite().await?;
+        let shutdown = rocket.shutdown();
+        let rocket_task = tokio::spawn(rocket.launch()).map(|res| match res {
+            Ok(Ok(Rocket { .. })) => Ok(()),
+            Ok(Err(e)) => Err(Error::from(e)),
+            Err(e) => Err(Error::from(e)),
+        });
+        let supervisor_task = tokio::spawn(run_supervisor(shutdown)).map(|res| match res {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(e)) => Err(Error::from(e)),
+            Err(e) => Err(Error::from(e)),
+        });
+        let ((), ()) = tokio::try_join!(rocket_task, supervisor_task)?;
+    }
     Ok(())
 }

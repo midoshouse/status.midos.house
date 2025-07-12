@@ -21,6 +21,7 @@ warnings = "deny"
 [dependencies]
 async-proto = "0.25.1"
 base64 = "0.22.1"
+clap = { version = "4.5.41", features = ["derive"] }
 collect-mac = "0.1.0"
 derivative = "2.2.0"
 dir-lock = "0.4.1"
@@ -40,7 +41,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
 sha2 = "0.10.8"
 thiserror = "2.0.12"
-tokio = { version = "1.44.2", features = ["process", "sync", "time"] }
+tokio = { version = "1.44.2", features = ["net", "process", "sync", "time"] }
 url = "2.5.4"
 wheel = { git = "https://github.com/fenhl/wheel", branch = "main", features = ["rocket", "serde_json"] }
 which = "7.0.3"

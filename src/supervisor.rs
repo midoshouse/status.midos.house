@@ -2,7 +2,10 @@ use {
     std::{
         borrow::Cow,
         cmp::Ordering::*,
-        collections::HashSet,
+        collections::{
+            HashSet,
+            VecDeque,
+        },
         env,
         iter,
         path::Path,
@@ -15,16 +18,22 @@ use {
         time::Duration,
     },
     async_proto::{
-        Protocol as _,
+        Protocol,
         ReadError,
         ReadErrorKind,
     },
     dir_lock::DirLock,
     directories::UserDirs,
-    futures::future::{
-        self,
-        Either,
-        FutureExt as _,
+    futures::{
+        future::{
+            self,
+            Either,
+            FutureExt as _,
+        },
+        stream::{
+            FuturesUnordered,
+            StreamExt as _,
+        },
     },
     itertools::Itertools as _,
     lazy_regex::regex_captures,
@@ -59,11 +68,23 @@ use {
     },
     crate::GIT_COMMIT_HASH,
 };
+#[cfg(unix)] use {
+    tokio::net::{
+        UnixListener,
+        UnixStream,
+    },
+    crate::unix_socket::{
+        self,
+        Subcommand,
+    },
+};
+#[cfg(not(unix))] use tokio::io::Empty as UnixStream;
 #[cfg(windows)] use directories::BaseDirs;
 
 const BIN_PATH: &str = "/usr/local/share/midos-house/bin/midos-house";
 const LIVE_REPO_PATH: &str = "/opt/git/github.com/midoshouse/midos.house/main";
 const BUILD_REPO_PATH: &str = "/opt/git/github.com/midoshouse/midos.house/build";
+const MW_BUILD_REPO_PATH: &str = "/opt/git/github.com/midoshouse/ootr-multiworld/build";
 const SELF_REPO_PATH: &str = "/opt/git/github.com/midoshouse/status.midos.house/main";
 
 fn rust_lock_dir() -> Cow<'static, Path> {
@@ -143,6 +164,7 @@ pub(crate) enum Error {
     #[error(transparent)] Task(#[from] tokio::task::JoinError),
     #[error(transparent)] Utf8(#[from] std::string::FromUtf8Error),
     #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[error(transparent)] Write(#[from] async_proto::WriteError),
     #[error("failed to parse version of midos-house-next")]
     NextVersion,
     #[error("failed to access user directories")]
@@ -151,9 +173,25 @@ pub(crate) enum Error {
 
 impl Supervisor {
     pub(crate) async fn new() -> Result<(Self, impl FnOnce(rocket::Shutdown) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>), Error> {
+        #[cfg(not(unix))]
+        /// Dummy type implementing a subset of `tokio::net::UnixListener`'s API, used since `tokio::select!` doesn't support conditional compilation.
+        struct UnixListener;
+
+        #[cfg(not(unix))]
+        impl UnixListener {
+            async fn accept(&self) -> io::Result<(UnixStream, ())> {
+                future::pending().await
+            }
+        }
+
+        #[cfg(not(unix))]
+        #[derive(Protocol)]
+        enum Subcommand {}
+
         let running = gix::open(LIVE_REPO_PATH)?.head_commit()?.id;
         let user_dirs = UserDirs::new().ok_or(Error::UserDirs)?;
         let next_path = user_dirs.home_dir().join("bin").join("midos-house-next");
+        let mw_next_path = user_dirs.home_dir().join("bin").join("ootrmwd-next");
         let mut built_commit = match Command::new(&next_path).arg("--version").stdout(Stdio::piped()).check("midos-house-next --version").await {
             Ok(process::Output { stdout, .. }) => regex_captures!(r"\(([0-9a-z]{40})\)", &String::from_utf8(stdout)?).ok_or(Error::NextVersion)?.1.parse()?,
             Err(wheel::Error::Io { inner, .. }) if inner.kind() == io::ErrorKind::NotFound => running,
@@ -219,8 +257,10 @@ impl Supervisor {
             webhook: webhook_tx,
         };
         let mut build_task = this.build_task(&user_dirs, &next_path).await;
+        let mut mw_build_task = None;
         let mut self_build_task = this.self_build_task(&user_dirs).await;
         let mut needs_rebuild = false;
+        let mut needs_mw_rebuild = VecDeque::default();
         let mut needs_self_rebuild = false;
         let (mut prepare_stop_child, mut prepare_stop_read) = if built_commit == running {
             (None, future::pending().boxed())
@@ -230,10 +270,21 @@ impl Supervisor {
             (Some(child), prepare_stop_read)
         };
         let mut needs_self_restart = false;
+        #[cfg(unix)] { fs::remove_file(unix_socket::PATH).await.missing_ok()?; }
+        let unix_listener = {
+            #[cfg(unix)] { UnixListener::bind(unix_socket::PATH).at(unix_socket::PATH)? }
+            #[cfg(not(unix))] { UnixListener }
+        };
+        let mut unix_streams = FuturesUnordered::default();
         Ok((this.clone(), move |mut shutdown: rocket::Shutdown| async move {
             loop {
                 let build_task_or_pending = if let Some(build_task) = &mut build_task {
                     Either::Left(build_task)
+                } else {
+                    Either::Right(future::pending())
+                };
+                let mw_build_task_or_pending = if let Some(mw_build_task) = &mut mw_build_task {
+                    Either::Left(mw_build_task)
                 } else {
                     Either::Right(future::pending())
                 };
@@ -299,7 +350,7 @@ impl Supervisor {
                             needs_rebuild = false;
                             this.build_task(&user_dirs, &next_path).await
                         } else {
-                            if needs_self_restart {
+                            if needs_self_restart && mw_build_task.is_none() {
                                 println!("supervisor: notifying rocket to shut down");
                                 shutdown.notify();
                                 println!("supervisor: exiting for self-restart");
@@ -312,6 +363,22 @@ impl Supervisor {
                             prepare_stop_read = PrepareStopUpdate::read_owned(child.stdout.take().expect("stdout was piped"));
                             prepare_stop_child = Some(child);
                         }
+                    }
+                    res = mw_build_task_or_pending => {
+                        let mut sock = res??;
+                        0u8.write(&mut sock).await?;
+                        unix_streams.push(Subcommand::read_owned(sock));
+                        mw_build_task = if let Some(sock) = needs_mw_rebuild.pop_front() {
+                            Some(this.mw_build_task(&user_dirs, &mw_next_path, sock).await)
+                        } else {
+                            if needs_self_restart && build_task.is_none() {
+                                println!("supervisor: notifying rocket to shut down");
+                                shutdown.notify();
+                                println!("supervisor: exiting for self-restart");
+                                break
+                            }
+                            None
+                        };
                     }
                     res = self_build_task_or_pending => {
                         let built_commit = res??;
@@ -333,7 +400,7 @@ impl Supervisor {
                         } else {
                             None
                         };
-                        if build_task.is_some() {
+                        if build_task.is_some() || mw_build_task.is_some() {
                             needs_self_restart = true;
                         } else {
                             println!("supervisor: notifying rocket to shut down");
@@ -399,6 +466,27 @@ impl Supervisor {
                                 status.future.drain(..=idx);
                             }
                         });
+                    }
+                    res = unix_listener.accept() => {
+                        let (sock, _) = res.at_unknown()?;
+                        unix_streams.push(Subcommand::read_owned(sock));
+                    }
+                    Some(res) = unix_streams.next() => match res {
+                        #[allow(unused)] Ok((sock, subcommand)) => {
+                            match subcommand {
+                                #[cfg(unix)] Subcommand::BuildMw => {
+                                    if mw_build_task.is_some() {
+                                        needs_mw_rebuild.push_back(sock);
+                                    } else {
+                                        mw_build_task = Some(this.mw_build_task(&user_dirs, &mw_next_path, sock).await);
+                                    }
+                                    continue
+                                }
+                            }
+                            unix_streams.push(Subcommand::read_owned(sock));
+                        }
+                        Err(ReadError { kind: ReadErrorKind::Io(e), .. }) if e.kind() == io::ErrorKind::UnexpectedEof => {}
+                        Err(e) => return Err(e.into()),
                     }
                 }
             }
@@ -514,6 +602,42 @@ impl Supervisor {
             } else {
                 None
             }
+        })
+    }
+
+    async fn mw_build_task(&self, user_dirs: &UserDirs, next_path: &Path, sock: UnixStream) -> tokio::task::JoinHandle<Result<UnixStream, Error>> {
+        let user_dirs = user_dirs.clone();
+        let next_path = next_path.to_owned();
+        tokio::spawn(async move {
+            Command::new("git").arg("reset").arg("--hard").arg("origin/main").current_dir(MW_BUILD_REPO_PATH).check("git reset").await?;
+            if !which("rustup").is_ok_and(|rustup_path| rustup_path.starts_with("/nix/store")) { // skip self-update if rustup is managed (nix is assumed to be updated automatically)
+                println!("supervisor: updating rustup");
+                let lock = DirLock::new(rust_lock_dir()).await?;
+                let mut rustup_cmd = Command::new("rustup");
+                rustup_cmd.arg("self");
+                rustup_cmd.arg("update");
+                rustup_cmd.env("PATH", env::join_paths(iter::once(user_dirs.home_dir().join(".cargo").join("bin")).chain(env::var_os("PATH").map(|path| env::split_paths(&path).collect::<Vec<_>>()).into_iter().flatten()))?);
+                rustup_cmd.kill_on_drop(true);
+                rustup_cmd.create_no_window();
+                rustup_cmd.check("rustup").await?;
+                lock.drop_async().await?;
+            }
+            println!("supervisor: updating Rust");
+            let lock = DirLock::new(rust_lock_dir()).await?;
+            let mut rustup_cmd = Command::new("rustup");
+            rustup_cmd.arg("update");
+            rustup_cmd.arg("stable");
+            rustup_cmd.env("PATH", env::join_paths(iter::once(user_dirs.home_dir().join(".cargo").join("bin")).chain(env::var_os("PATH").map(|path| env::split_paths(&path).collect::<Vec<_>>()).into_iter().flatten()))?);
+            rustup_cmd.kill_on_drop(true);
+            rustup_cmd.create_no_window();
+            rustup_cmd.check("rustup").await?;
+            lock.drop_async().await?;
+            //TODO cargo sweep (limit to once per Rust version)
+            println!("supervisor: building mw");
+            Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("build").arg("--release").arg("--package=ootrmwd").arg("--features=require-user-agent-salt").current_dir(MW_BUILD_REPO_PATH).kill_on_drop(true).check("cargo build").await?;
+            fs::rename(Path::new(MW_BUILD_REPO_PATH).join("target").join("release").join("ootrmwd"), &next_path).await?;
+            Command::new("chmod").arg("+x").arg(&next_path).check("chmod").await?;
+            Ok(sock)
         })
     }
 
