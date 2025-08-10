@@ -563,7 +563,12 @@ impl Supervisor {
     async fn build_task(&self, user_dirs: &UserDirs, next_path: &Path) -> Option<tokio::task::JoinHandle<Result<gix::ObjectId, Error>>> {
         lock!(@write status = self.status; {
             let _ = status.watch.send(());
-            if let Some((new_head, _, status @ CommitStatus::Pending)) = status.future.last_mut() {
+            for (_, _, status) in &mut status.future {
+                if let CommitStatus::Pending = status {
+                    *status = CommitStatus::Skipped;
+                }
+            }
+            if let Some((new_head, _, status @ CommitStatus::Skipped)) = status.future.last_mut() {
                 *status = CommitStatus::Build;
                 let new_head = *new_head;
                 let user_dirs = user_dirs.clone();
@@ -644,7 +649,12 @@ impl Supervisor {
     async fn self_build_task(&self, user_dirs: &UserDirs) -> Option<tokio::task::JoinHandle<Result<gix::ObjectId, Error>>> {
         lock!(@write status = self.status; {
             let _ = status.watch.send(());
-            if let Some((new_head, _, status @ SelfCommitStatus::Pending)) = status.self_future.last_mut() {
+            for (_, _, status) in &mut status.self_future {
+                if let SelfCommitStatus::Pending = status {
+                    *status = SelfCommitStatus::Skipped;
+                }
+            }
+            if let Some((new_head, _, status @ SelfCommitStatus::Skipped)) = status.self_future.last_mut() {
                 *status = SelfCommitStatus::Build;
                 let new_head = *new_head;
                 let user_dirs = user_dirs.clone();
