@@ -116,6 +116,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                     code(id = "mh-current") {
                         a(href = format!("https://github.com/midoshouse/midos.house/commit/{running}")) : running.to_hex_with_len(7).to_string();
                     }
+                    : " • ";
+                    a(href = format!("https://github.com/midoshouse/midos.house/commits/{running}")) : "history";
                 }
                 p(id = "mh-future-empty", style? = (!future.is_empty()).then_some("display: none;")) : "Mido's House is up to date.";
                 div(id = "mh-future-nonempty", style? = future.is_empty().then_some("display: none;")) {
@@ -177,6 +179,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                     code(id = "mw-current") {
                         a(href = format!("https://github.com/midoshouse/ootr-multiworld/commit/{mw_commit_hash}")) : mw_commit_hash.to_hex_with_len(7).to_string();
                     }
+                    : " • ";
+                    a(href = format!("https://github.com/midoshouse/ootr-multiworld/commits/{mw_commit_hash}")) : "history";
                 }
                 p { //TODO determine server update status (major updates still need to be managed by release script to coordinate with client releases, but minor/patch/same-version updates could be managed by the supervisor)
                     : "Please see ";
@@ -195,6 +199,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                     code {
                         a(href = format!("https://github.com/midoshouse/status.midos.house/commit/{GIT_COMMIT_HASH}")) : GIT_COMMIT_HASH.to_hex_with_len(7).to_string();
                     }
+                    : " • ";
+                    a(href = format!("https://github.com/midoshouse/status.midos.house/commits/{GIT_COMMIT_HASH}")) : "history";
                 }
                 p(id = "self-future-empty", style? = (!self_future.is_empty()).then_some("display: none;")) : "status.midos.house is up to date.";
                 div(id = "self-future-nonempty", style? = self_future.is_empty().then_some("display: none;")) {
@@ -242,6 +248,8 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                     code(id = "tracker-current") {
                         a(href = format!("https://github.com/fenhl/oottracker/commit/{tracker_commit_hash}")) : tracker_commit_hash.to_hex_with_len(7).to_string();
                     }
+                    : " • ";
+                    a(href = format!("https://github.com/fenhl/oottracker/commits/{tracker_commit_hash}")) : "history";
                 }
                 p { //TODO determine server update status and auto-update when no multiworld tracker rooms are open
                     : "Please see ";
