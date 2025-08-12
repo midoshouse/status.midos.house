@@ -18,7 +18,7 @@ pub(crate) struct Config {
 impl Config {
     pub(crate) async fn load() -> Result<Self, crate::Error> {
         #[cfg(unix)] {
-            if let Some(config_path) = BaseDirectories::new()?.find_config_file("midos-house.json") {
+            if let Some(config_path) = BaseDirectories::new().find_config_file("midos-house.json") {
                 Ok(fs::read_json(config_path).await?)
             } else {
                 Err(crate::Error::MissingConfigFile)

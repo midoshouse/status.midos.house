@@ -19,17 +19,17 @@ unused_qualifications = "deny"
 warnings = "deny"
 
 [dependencies]
-async-proto = "0.25.1"
+async-proto = "0.26"
 base64 = "0.22.1"
 clap = { version = "4.5.41", features = ["derive"] }
 collect-mac = "0.1.0"
 derivative = "2.2.0"
-dir-lock = "0.4.1"
+dir-lock = "0.5"
 directories = "6.0.0"
 futures = "0.3.31"
-gix = "0.72"
+gix = "0.73"
 hmac = "0.12.1"
-itermore = { version = "0.7.1", features = ["array_chunks"] }
+itermore = { version = "0.8", features = ["array_chunks"] }
 itertools = "0.14.0"
 lazy-regex = "3.4.1"
 log-lock = { git = "https://github.com/fenhl/log-lock", branch = "main" }
@@ -44,10 +44,10 @@ thiserror = "2.0.12"
 tokio = { version = "1.44.2", features = ["net", "process", "sync", "time"] }
 url = "2.5.4"
 wheel = { git = "https://github.com/fenhl/wheel", branch = "main", features = ["rocket", "serde_json"] }
-which = "7.0.3"
+which = "8"
 
 [target."cfg(unix)".dependencies]
-xdg = "2.5.2"
+xdg = "3"
 
 [build-dependencies]
 gix = "0.72"

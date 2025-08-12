@@ -465,7 +465,6 @@ enum Error {
     #[error(transparent)] Task(#[from] tokio::task::JoinError),
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[cfg(unix)] #[error(transparent)] Write(#[from] async_proto::WriteError),
-    #[cfg(unix)] #[error(transparent)] Xdg(#[from] xdg::BaseDirectoriesError),
     #[cfg(unix)]
     #[error("missing config file")]
     MissingConfigFile,
