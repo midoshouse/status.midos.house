@@ -24,6 +24,7 @@ function startWebsocket() {
                         mhCurrent.setAttribute('href', `https://github.com/midoshouse/midos.house/commit/${payload.running}`);
                         mhCurrent.appendChild(document.createTextNode(payload.running.slice(0, 7)));
                         document.getElementById('mh-current').replaceChildren(mhCurrent);
+                        document.getElementById('mh-history').setAttribute('href', `https://github.com/midoshouse/midos.house/commits/${payload.running}`);
                     }
                     if ('future' in payload) {
                         if (payload.future.length == 0) {

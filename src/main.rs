@@ -117,7 +117,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                         a(href = format!("https://github.com/midoshouse/midos.house/commit/{running}")) : running.to_hex_with_len(7).to_string();
                     }
                     : " • ";
-                    a(href = format!("https://github.com/midoshouse/midos.house/commits/{running}")) : "history";
+                    a(id = "mh-history", href = format!("https://github.com/midoshouse/midos.house/commits/{running}")) : "history";
                 }
                 p(id = "mh-future-empty", style? = (!future.is_empty()).then_some("display: none;")) : "Mido's House is up to date.";
                 div(id = "mh-future-nonempty", style? = future.is_empty().then_some("display: none;")) {
@@ -174,9 +174,9 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                     }
                 }
                 @let mw_commit_hash = gix::open(MW_REPO_PATH)?.head_commit()?.id;
-                p {
+                p { //TODO update live
                     : "Currently running: ";
-                    code(id = "mw-current") {
+                    code {
                         a(href = format!("https://github.com/midoshouse/ootr-multiworld/commit/{mw_commit_hash}")) : mw_commit_hash.to_hex_with_len(7).to_string();
                     }
                     : " • ";
@@ -243,9 +243,9 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                     }
                 }
                 @let tracker_commit_hash = gix::open(TRACKER_REPO_PATH)?.head_commit()?.id;
-                p {
+                p { //TODO update live
                     : "Currently running: ";
-                    code(id = "tracker-current") {
+                    code {
                         a(href = format!("https://github.com/fenhl/oottracker/commit/{tracker_commit_hash}")) : tracker_commit_hash.to_hex_with_len(7).to_string();
                     }
                     : " • ";
