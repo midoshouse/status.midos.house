@@ -614,6 +614,7 @@ impl Supervisor {
         let user_dirs = user_dirs.clone();
         let next_path = next_path.to_owned();
         tokio::spawn(async move {
+            Command::new("git").arg("fetch").current_dir(MW_BUILD_REPO_PATH).check("git fetch").await?;
             Command::new("git").arg("reset").arg("--hard").arg("origin/main").current_dir(MW_BUILD_REPO_PATH).check("git reset").await?;
             if !which("rustup").is_ok_and(|rustup_path| rustup_path.starts_with("/nix/store")) { // skip self-update if rustup is managed (nix is assumed to be updated automatically)
                 println!("supervisor: updating rustup");
