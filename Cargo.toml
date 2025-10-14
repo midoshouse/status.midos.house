@@ -50,5 +50,5 @@ which = "8"
 xdg = "3"
 
 [build-dependencies]
-gix = "0.72"
+gix = "0.73"
 itertools = "0.14.0"
