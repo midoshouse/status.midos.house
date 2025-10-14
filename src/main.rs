@@ -142,7 +142,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                                     td {
                                         @match status {
                                             CommitStatus::Pending => : "waiting for other builds to finish";
-                                            CommitStatus::Skipped => : "skipped";
+                                            CommitStatus::Bundled => : "skipped (bundled with next commit)";
                                             CommitStatus::Build => : "building";
                                             CommitStatus::PrepareStopInit => : "waiting for reply to shutdown request";
                                             CommitStatus::PrepareStopAcquiringMutex => : "waiting for access to clean shutdown state";
@@ -225,7 +225,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                                     td {
                                         @match status {
                                             SelfCommitStatus::Pending => : "waiting for other builds to finish";
-                                            SelfCommitStatus::Skipped => : "skipped";
+                                            SelfCommitStatus::Bundled => : "skipped (bundled with next commit)";
                                             SelfCommitStatus::Build => : "building";
                                             SelfCommitStatus::WaitRestart => : "waiting for other builds to finish"; //TODO distinguish from Pending?
                                         }

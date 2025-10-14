@@ -103,7 +103,7 @@ pub(crate) struct Status {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum CommitStatus {
     Pending,
-    Skipped,
+    Bundled,
     Build,
     PrepareStopInit,
     PrepareStopAcquiringMutex,
@@ -116,7 +116,7 @@ pub(crate) enum CommitStatus {
 impl CommitStatus {
     fn is_prepare_stop(&self) -> bool {
         match self {
-            Self::Skipped | Self::Build | Self::Pending => false,
+            Self::Bundled | Self::Build | Self::Pending => false,
             Self::PrepareStopInit | Self::PrepareStopAcquiringMutex | Self::WaitingForRooms { .. } | Self::Deploy => true,
         }
     }
@@ -126,7 +126,7 @@ impl CommitStatus {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum SelfCommitStatus {
     Pending,
-    Skipped,
+    Bundled,
     Build,
     WaitRestart,
 }
@@ -227,7 +227,7 @@ impl Supervisor {
                         match idx.cmp(&built_idx) {
                             Less => CommitStatus::Pending,
                             Equal => CommitStatus::PrepareStopInit,
-                            Greater => CommitStatus::Skipped,
+                            Greater => CommitStatus::Bundled,
                         }
                     } else {
                         CommitStatus::Pending
@@ -339,7 +339,7 @@ impl Supervisor {
                                     .unwrap_or(CommitStatus::PrepareStopInit);
                                 for (idx, (_, _, status)) in status.future.iter_mut().enumerate() {
                                     *status = match idx.cmp(&built_idx) {
-                                        Less => CommitStatus::Skipped,
+                                        Less => CommitStatus::Bundled,
                                         Equal => prepare_stop_status.clone(),
                                         Greater => CommitStatus::Pending,
                                     };
@@ -387,7 +387,7 @@ impl Supervisor {
                             if let Ok(built_idx) = status.self_future.binary_search_by_key(&built_commit, |(commit_hash, _, _)| *commit_hash) {
                                 for (idx, (_, _, status)) in status.self_future.iter_mut().enumerate() {
                                     *status = match idx.cmp(&built_idx) {
-                                        Less => SelfCommitStatus::Skipped,
+                                        Less => SelfCommitStatus::Bundled,
                                         Equal => SelfCommitStatus::WaitRestart,
                                         Greater => SelfCommitStatus::Pending,
                                     };
@@ -565,10 +565,10 @@ impl Supervisor {
             let _ = status.watch.send(());
             for (_, _, status) in &mut status.future {
                 if let CommitStatus::Pending = status {
-                    *status = CommitStatus::Skipped;
+                    *status = CommitStatus::Bundled;
                 }
             }
-            if let Some((new_head, _, status @ CommitStatus::Skipped)) = status.future.last_mut() {
+            if let Some((new_head, _, status @ CommitStatus::Bundled)) = status.future.last_mut() {
                 *status = CommitStatus::Build;
                 let new_head = *new_head;
                 let user_dirs = user_dirs.clone();
@@ -652,10 +652,10 @@ impl Supervisor {
             let _ = status.watch.send(());
             for (_, _, status) in &mut status.self_future {
                 if let SelfCommitStatus::Pending = status {
-                    *status = SelfCommitStatus::Skipped;
+                    *status = SelfCommitStatus::Bundled;
                 }
             }
-            if let Some((new_head, _, status @ SelfCommitStatus::Skipped)) = status.self_future.last_mut() {
+            if let Some((new_head, _, status @ SelfCommitStatus::Bundled)) = status.self_future.last_mut() {
                 *status = SelfCommitStatus::Build;
                 let new_head = *new_head;
                 let user_dirs = user_dirs.clone();

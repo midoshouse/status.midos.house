@@ -50,7 +50,7 @@ function startWebsocket() {
                                     const statusCell = document.createElement('td');
                                     switch (commit.status.type) {
                                         case 'pending': statusCell.appendChild(document.createTextNode('waiting for other builds to finish')); break;
-                                        case 'skipped': statusCell.appendChild(document.createTextNode('skipped')); break;
+                                        case 'bundled': statusCell.appendChild(document.createTextNode('skipped (bundled with next commit)')); break;
                                         case 'build': statusCell.appendChild(document.createTextNode('building')); break;
                                         case 'prepareStopInit': statusCell.appendChild(document.createTextNode('waiting for reply to shutdown request')); break;
                                         case 'prepareStopAcquiringMutex': statusCell.appendChild(document.createTextNode('waiting for access to clean shutdown state')); break;
@@ -109,7 +109,7 @@ function startWebsocket() {
                                     const statusCell = document.createElement('td');
                                     switch (commit.status.type) {
                                         case 'pending': statusCell.appendChild(document.createTextNode('waiting for other builds to finish')); break;
-                                        case 'skipped': statusCell.appendChild(document.createTextNode('skipped')); break;
+                                        case 'bundled': statusCell.appendChild(document.createTextNode('skipped (bundled with next commit)')); break;
                                         case 'build': statusCell.appendChild(document.createTextNode('building')); break;
                                         case 'waitRestart': statusCell.appendChild(document.createTextNode('waiting for other builds to finish')); break; //TODO distinguish from pending?
                                     }
