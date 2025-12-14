@@ -7,19 +7,19 @@ if (-not $?)
 }
 
 # copy the tree to the WSL file system to improve compile times
-wsl rsync --delete -av /mnt/c/Users/fenhl/git/github.com/midoshouse/status.midos.house/stage/ /home/fenhl/wslgit/github.com/midoshouse/status.midos.house/ --exclude target
+wsl -d ubuntu-m2 rsync --mkpath --delete -av /mnt/c/Users/fenhl/git/github.com/midoshouse/status.midos.house/stage/ /home/fenhl/wslgit/github.com/midoshouse/status.midos.house/ --exclude target
 if (-not $?)
 {
     throw 'Native Failure'
 }
 
-wsl rustup update stable
+wsl -d ubuntu-m2 /home/fenhl/.cargo/bin/rustup update stable
 if (-not $?)
 {
     throw 'Native Failure'
 }
 
-wsl env -C /home/fenhl/wslgit/github.com/midoshouse/status.midos.house cargo check
+wsl -d ubuntu-m2 env -C /home/fenhl/wslgit/github.com/midoshouse/status.midos.house /home/fenhl/.cargo/bin/cargo check
 if (-not $?)
 {
     throw 'Native Failure'
