@@ -107,7 +107,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                         img(class = "chest", src = uri!(chest));
                     }
                     div(class = "header-text") {
-                        h1 : "Mido's House ";
+                        h1 : "Mido's House";
                         div(class = "subtitle") : "website, Discord bot, racetime.gg bot";
                     }
                 }
@@ -190,7 +190,7 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
                 div(class = "header") {
                     img(src = uri!(lens));
                     div(class = "header-text") {
-                        h1 : "status.midos.house ";
+                        h1 : "status.midos.house";
                         div(class = "subtitle") : "this page";
                     }
                 }

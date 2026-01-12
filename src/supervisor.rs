@@ -601,7 +601,6 @@ impl Supervisor {
                     println!("supervisor: building {new_head}");
                     Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("build").arg("--release").arg("--target=x86_64-unknown-linux-musl").current_dir(BUILD_REPO_PATH).kill_on_drop(true).check("cargo build").await?;
                     fs::rename(Path::new(BUILD_REPO_PATH).join("target").join("x86_64-unknown-linux-musl").join("release").join("midos-house"), &next_path).await?;
-                    Command::new("chmod").arg("+x").arg(&next_path).check("chmod").await?;
                     Ok(new_head)
                 }))
             } else {
@@ -642,7 +641,6 @@ impl Supervisor {
             println!("supervisor: building mw");
             Command::new(user_dirs.home_dir().join(".cargo").join("bin").join("cargo")).arg("build").arg("--release").arg("--package=ootrmwd").arg("--features=require-user-agent-salt").current_dir(MW_BUILD_REPO_PATH).kill_on_drop(true).check("cargo build").await?;
             fs::rename(Path::new(MW_BUILD_REPO_PATH).join("target").join("release").join("ootrmwd"), &next_path).await?;
-            Command::new("chmod").arg("+x").arg(&next_path).check("chmod").await?;
             Ok(sock)
         })
     }
