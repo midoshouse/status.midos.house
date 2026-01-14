@@ -4,12 +4,14 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use {
     std::{
         collections::HashMap,
+        ops::Range,
         time::Duration,
     },
     base64::engine::{
         Engine as _,
         general_purpose::STANDARD as BASE64,
     },
+    chrono::prelude::*,
     collect_mac::collect,
     derivative as _, // only used in lib
     futures::future::FutureExt as _,
@@ -47,6 +49,11 @@ use {
     serde::Deserialize,
     serde_json::json,
     sha2::Sha256,
+    sqlx::postgres::{
+        PgConnectOptions,
+        PgPool,
+        PgPoolOptions,
+    },
     tokio::{
         select,
         time::sleep,
@@ -61,6 +68,10 @@ use {
             SelfCommitStatus,
             Supervisor,
         },
+        time::{
+            DateTimeFormat,
+            format_datetime,
+        },
     },
 };
 #[cfg(unix)] use {
@@ -71,6 +82,7 @@ use {
 
 mod config;
 mod supervisor;
+mod time;
 #[cfg(unix)] mod unix_socket;
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
@@ -82,10 +94,11 @@ const TRACKER_REPO_PATH: &str = "/opt/git/github.com/fenhl/oottracker/branch/mw"
 enum IndexError {
     #[error(transparent)] GitHeadCommit(#[from] gix::reference::head_commit::Error),
     #[error(transparent)] GitOpen(#[from] gix::open::Error),
+    #[error(transparent)] Sql(#[from] sqlx::Error),
 }
 
 #[rocket::get("/")]
-async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexError> {
+async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexError> {
     let supervisor::Status { watch: _, ref running, ref future, ref self_future } = *supervisor.status().await;
     Ok(html! {
         : Doctype;
@@ -99,6 +112,15 @@ async fn index(supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexE
             }
             body {
                 p(id = "websocket-state") : "Please enable JavaScript to allow this page to update automatically, or refresh occasionally to see the current status.";
+                @if let Some(window) = sqlx::query_as!(Range::<DateTime<Utc>>, r#"SELECT start, end_time AS "end" FROM maintenance_windows WHERE kind = 'midos_house' AND start <= NOW() + INTERVAL '168:00:00' AND end_time > NOW() ORDER BY start LIMIT 1"#).fetch_optional(&**db_pool).await? { //TODO continuously check via WebSocket
+                    p(class = "warning") {
+                        : "Maintenance on the Mido's House server is scheduled from ";
+                        : format_datetime(window.start, DateTimeFormat { long: true, running_text: true });
+                        : " until ";
+                        : format_datetime(window.end, DateTimeFormat { long: true, running_text: true });
+                        : ". The services listed here (including this page) may go offline for a while during that time.";
+                    }
+                }
                 div(class = "header") {
                     div(class = "logo") {
                         img(class = "chest", src = uri!(chest));
@@ -469,6 +491,7 @@ enum Error {
     #[error(transparent)] Json(#[from] serde_json::Error),
     #[cfg(unix)] #[error(transparent)] Read(#[from] async_proto::ReadError),
     #[error(transparent)] Rocket(#[from] rocket::Error),
+    #[error(transparent)] Sql(#[from] sqlx::Error),
     #[error(transparent)] Supervisor(#[from] supervisor::Error),
     #[error(transparent)] Task(#[from] tokio::task::JoinError),
     #[error(transparent)] Wheel(#[from] wheel::Error),
@@ -495,6 +518,13 @@ async fn main(Args { subcommand }: Args) -> Result<(), Error> {
             default_panic_hook(info)
         }));
         let config = Config::load().await?;
+        let db_pool = PgPoolOptions::default()
+            .max_connections(16)
+            .connect_with(PgConnectOptions::default()
+                .username("mido")
+                .database("midos_house")
+                .application_name("mhstatus")
+            ).await?;
         let (supervisor, run_supervisor) = Supervisor::new().await?;
         let rocket = rocket::custom(rocket::Config {
             secret_key: SecretKey::from(&BASE64.decode(&config.secret_key)?),
@@ -518,6 +548,7 @@ async fn main(Args { subcommand }: Args) -> Result<(), Error> {
             fallback_catcher,
         ])
         .manage(config)
+        .manage(db_pool)
         .manage(supervisor.clone())
         .ignite().await?;
         let shutdown = rocket.shutdown();

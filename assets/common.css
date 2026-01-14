@@ -2,6 +2,15 @@ body {
     font-family: system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+.warning {
+    border: 1px solid #909000;
+}
+
+p.warning {
+    background-color: #ffff90;
+    padding: 8px;
+}
+
 .header {
     display: flex;
 }
@@ -101,6 +110,14 @@ table td {
     body {
         background-color: black;
         color: white;
+    }
+
+    .warning {
+        border-color: #ffff00;
+    }
+
+    p.warning {
+        background-color: #404000;
     }
 
     tbody > tr:hover {
