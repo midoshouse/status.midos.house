@@ -7,7 +7,7 @@ if (-not $?)
 }
 
 # copy the tree to the WSL file system to improve compile times
-wsl -d ubuntu-m2 rsync --mkpath --delete -av /mnt/c/Users/fenhl/git/github.com/midoshouse/status.midos.house/stage/ /home/fenhl/wslgit/github.com/midoshouse/status.midos.house/ --exclude .cargo/config.toml --exclude target
+wsl -d ubuntu-m2 rsync --mkpath --delete -av /mnt/c/Users/fenhl/git/github.com/midoshouse/status.midos.house/stage/ /home/fenhl/wslgit/github.com/midoshouse/status.midos.house/ --exclude target
 if (-not $?)
 {
     throw 'Native Failure'

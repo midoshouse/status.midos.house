@@ -4,7 +4,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use {
     std::{
         collections::HashMap,
-        ops::Range,
         time::Duration,
     },
     base64::engine::{
@@ -49,10 +48,13 @@ use {
     serde::Deserialize,
     serde_json::json,
     sha2::Sha256,
-    sqlx::postgres::{
-        PgConnectOptions,
-        PgPool,
-        PgPoolOptions,
+    sqlx::{
+        Row as _,
+        postgres::{
+            PgConnectOptions,
+            PgPool,
+            PgPoolOptions,
+        },
     },
     tokio::{
         select,
@@ -112,12 +114,12 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
             }
             body {
                 p(id = "websocket-state") : "Please enable JavaScript to allow this page to update automatically, or refresh occasionally to see the current status.";
-                @if let Some(window) = sqlx::query_as!(Range::<DateTime<Utc>>, r#"SELECT start, end_time AS "end" FROM maintenance_windows WHERE kind = 'midos_house' AND start <= NOW() + INTERVAL '168:00:00' AND end_time > NOW() ORDER BY start LIMIT 1"#).fetch_optional(&**db_pool).await? { //TODO continuously check via WebSocket
+                @if let Some(row) = sqlx::query(r#"SELECT start, end_time FROM maintenance_windows WHERE kind = 'midos_house' AND start <= NOW() + INTERVAL '168:00:00' AND end_time > NOW() ORDER BY start LIMIT 1"#).fetch_optional(&**db_pool).await? { //TODO continuously check via WebSocket
                     p(class = "warning") {
                         : "Maintenance on the Mido's House server is scheduled from ";
-                        : format_datetime(window.start, DateTimeFormat { long: true, running_text: true });
+                        : format_datetime(row.get::<DateTime<Utc>, _>("start"), DateTimeFormat { long: true, running_text: true });
                         : " until ";
-                        : format_datetime(window.end, DateTimeFormat { long: true, running_text: true });
+                        : format_datetime(row.get::<DateTime<Utc>, _>("end_time"), DateTimeFormat { long: true, running_text: true });
                         : ". The services listed here (including this page) may go offline for a while during that time.";
                     }
                 }
