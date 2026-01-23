@@ -99,6 +99,10 @@ table td {
     height: 16px;
 }
 
+footer {
+    color: gray;
+}
+
 @media (min-width: 768px) {
     table th,
     table td {

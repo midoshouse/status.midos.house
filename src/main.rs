@@ -131,7 +131,9 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
                         img(class = "chest", src = uri!(chest));
                     }
                     div(class = "header-text") {
-                        h1 : "Mido's House";
+                        h1 {
+                            a(href = "https://midos.house/") : "Mido's House";
+                        }
                         div(class = "subtitle") : "website, Discord bot, racetime.gg bot";
                     }
                 }
@@ -193,7 +195,9 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
                 div(class = "header") {
                     img(src = uri!(mw_logo));
                     div(class = "header-text") {
-                        h1 : "Multiworld";
+                        h1 {
+                            a(href = "https://midos.house/mw") : "Multiworld";
+                        }
                         div(class = "subtitle") : "default room server";
                     }
                 }
@@ -262,7 +266,9 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
                 div(class = "header") {
                     img(src = uri!(tracker_logo));
                     div(class = "header-text") {
-                        h1 : "OoT Tracker";
+                        h1 {
+                            a(href = "https://oottracker.fenhl.net/") : "OoT Tracker";
+                        }
                         div(class = "subtitle") : "website for multiworld restream auto-tracking";
                     }
                 }
@@ -279,6 +285,21 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
                     : "Please see ";
                     a(href = format!("https://github.com/fenhl/oottracker/compare/{tracker_commit_hash}...mw")) : "GitHub";
                     : " for a list of pending updates.";
+                }
+                footer {
+                    p {
+                        : "hosted by ";
+                        a(href = "https://midos.house/user/14571800683221815449") : "Fenhl";
+                        : " • ";
+                        a(href = "https://fenhl.net/disc") : "disclaimer";
+                        : " • ";
+                        a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
+                    }
+                    p {
+                        : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                        a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
+                        : " for the Lens of Truth icon!";
+                    }
                 }
                 script : RawHtml(include_str!("../assets/common.js"));
             }
