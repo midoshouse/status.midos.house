@@ -29,7 +29,7 @@ derivative = "2.2.0"
 dir-lock = "0.5"
 directories = "6.0.0"
 futures = "0.3.31"
-gix = "0.77"
+gix = "0.78"
 hmac = "0.12.1"
 itermore = { version = "0.8", features = ["array_chunks"] }
 itertools = "0.14.0"
@@ -53,5 +53,5 @@ which = "8"
 xdg = "3"
 
 [build-dependencies]
-gix = "0.77"
+gix = "0.78"
 itertools = "0.14.0"
