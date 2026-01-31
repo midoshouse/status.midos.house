@@ -527,20 +527,121 @@ async fn github_webhook(supervisor: &State<Supervisor>, payload: SignedPayload) 
 }
 
 #[rocket::catch(404)]
-fn not_found() -> &'static str { //TODO HTML response
-    "Error 404: Not Found"
+fn not_found() -> RawHtml<String> {
+    html! {
+        : Doctype;
+        html {
+            head {
+                meta(charset = "utf-8");
+                title : "Not Found — Mido's House Status";
+                meta(name = "viewport", content = "width=device-width, initial-scale=1, shrink-to-fit=no");
+                link(rel = "icon", href = uri!(lens));
+                style : RawHtml(include_str!("../assets/common.css"));
+            }
+            body {
+                h1 : "Error 404: Not Found";
+                p : "There is no page here.";
+                p {
+                    a(href = uri!(index)) : "Back to status page";
+                }
+                footer {
+                    p {
+                        : "hosted by ";
+                        a(href = "https://midos.house/user/14571800683221815449") : "Fenhl";
+                        : " • ";
+                        a(href = "https://fenhl.net/disc") : "disclaimer";
+                        : " • ";
+                        a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
+                    }
+                    p {
+                        : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                        a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
+                        : " for the Lens of Truth icon!";
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[rocket::catch(500)]
-async fn internal_server_error() -> wheel::Result<&'static str> { //TODO HTML response
+async fn internal_server_error() -> wheel::Result<RawHtml<String>> {
     wheel::night_report("/net/midoshouse/status/error", Some("internal server error")).await?;
-    Ok("Error 500: Internal Server Error\nSorry, something went wrong. Please notify Fenhl on Discord.")
+    Ok(html! {
+        : Doctype;
+        html {
+            head {
+                meta(charset = "utf-8");
+                title : "Internal Server Error — Mido's House Status";
+                meta(name = "viewport", content = "width=device-width, initial-scale=1, shrink-to-fit=no");
+                link(rel = "icon", href = uri!(lens));
+                style : RawHtml(include_str!("../assets/common.css"));
+            }
+            body {
+                h1 : "Error 500: Internal Server Error";
+                p : "Sorry, something went wrong. Please notify Fenhl on Discord.";
+                footer {
+                    p {
+                        : "hosted by ";
+                        a(href = "https://midos.house/user/14571800683221815449") : "Fenhl";
+                        : " • ";
+                        a(href = "https://fenhl.net/disc") : "disclaimer";
+                        : " • ";
+                        a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
+                    }
+                    p {
+                        : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                        a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
+                        : " for the Lens of Truth icon!";
+                    }
+                }
+            }
+        }
+    })
 }
 
 #[rocket::catch(default)]
-async fn fallback_catcher(status: Status, _: &Request<'_>) -> wheel::Result<String> { //TODO HTML response
+async fn fallback_catcher(status: Status, _: &Request<'_>) -> wheel::Result<RawHtml<String>> {
     wheel::night_report("/net/midoshouse/status/error", Some(&format!("responding with unexpected HTTP status code: {} {}", status.code, status.reason_lossy()))).await?;
-    Ok(format!("Error {}: {}\nSorry, something went wrong. Please notify Fenhl on Discord.", status.code, status.reason_lossy()))
+    Ok(html! {
+        : Doctype;
+        html {
+            head {
+                meta(charset = "utf-8");
+                title {
+                    : status.reason_lossy();
+                    : " — Mido's House Status";
+                }
+                meta(name = "viewport", content = "width=device-width, initial-scale=1, shrink-to-fit=no");
+                link(rel = "icon", href = uri!(lens));
+                style : RawHtml(include_str!("../assets/common.css"));
+            }
+            body {
+                h1 {
+                    : "Error ";
+                    : status.code;
+                    : ": ";
+                    : status.reason_lossy();
+                }
+                p : "Sorry, something went wrong. Please notify Fenhl on Discord.";
+                footer {
+                    p {
+                        : "hosted by ";
+                        a(href = "https://midos.house/user/14571800683221815449") : "Fenhl";
+                        : " • ";
+                        a(href = "https://fenhl.net/disc") : "disclaimer";
+                        : " • ";
+                        a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
+                    }
+                    p {
+                        : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                        a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
+                        : " for the Lens of Truth icon!";
+                    }
+                }
+            }
+        }
+    })
 }
 
 #[cfg(not(unix))]
