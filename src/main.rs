@@ -4,6 +4,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use {
     std::{
         collections::HashMap,
+        convert::Infallible as Never,
         time::Duration,
     },
     base64::engine::{
@@ -21,6 +22,7 @@ use {
     itermore::IterArrayChunks as _,
     itertools::Itertools as _,
     rocket::{
+        Either,
         Rocket,
         State,
         async_trait,
@@ -36,7 +38,10 @@ use {
             Status,
         },
         outcome::Outcome,
-        request::Request,
+        request::{
+            self,
+            Request,
+        },
         response::content::RawHtml,
         uri,
     },
@@ -308,70 +313,110 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
 }
 
 #[rocket::get("/websocket")]
-async fn websocket(supervisor: &State<Supervisor>, ws: WebSocket, mut shutdown: rocket::Shutdown) -> rocket_ws::Stream![] {
-    let (mut running, mut future, mut self_future, mut watch) = {
-        let status = supervisor.status().await;
-        (status.running.clone(), status.future.clone(), status.self_future.clone(), status.watch.subscribe())
-    };
-    let supervisor = (**supervisor).clone();
-    rocket_ws::Stream! { ws =>
-        let _ = ws;
-        // repopulate page data with payload in case it changed in between the server-side page render and the WebSocket connection
-        yield rocket_ws::Message::Text(serde_json::to_string(&json!({
-            "type": "change",
-            "running": running.to_string(),
-            "future": future.iter().map(|(commit_hash, commit_msg, status)| json!({
-                "commitHash": commit_hash.to_string(),
-                "commitMsg": commit_msg,
-                "status": status,
-            })).collect_vec(),
-            "selfFuture": self_future.iter().map(|(commit_hash, commit_msg, status)| json!({
-                "commitHash": commit_hash.to_string(),
-                "commitMsg": commit_msg,
-                "status": status,
-            })).collect_vec(),
-        })).unwrap());
-        loop {
-            select! {
-                () = sleep(Duration::from_secs(30)) => {
-                    yield rocket_ws::Message::Text(serde_json::to_string(&json!({
-                        "type": "ping",
-                    })).unwrap());
-                }
-                res = watch.changed() => {
-                    if res.is_err() { break }
-                    let status = supervisor.status().await;
-                    let mut payload = collect![as HashMap<_, _>: format!("type") => json!("change")];
-                    if status.running != running {
-                        payload.insert(format!("running"), json!(status.running.to_string()));
-                        running = status.running;
+async fn websocket(supervisor: &State<Supervisor>, ws: request::Outcome<WebSocket, Never>, mut shutdown: rocket::Shutdown) -> Either<rocket_ws::Stream![], (Status, RawHtml<String>)> {
+    match ws {
+        Outcome::Success(ws) => Either::Left({
+            let (mut running, mut future, mut self_future, mut watch) = {
+                let status = supervisor.status().await;
+                (status.running.clone(), status.future.clone(), status.self_future.clone(), status.watch.subscribe())
+            };
+            let supervisor = (**supervisor).clone();
+            rocket_ws::Stream! { ws =>
+                let _ = ws;
+                // repopulate page data with payload in case it changed in between the server-side page render and the WebSocket connection
+                yield rocket_ws::Message::Text(serde_json::to_string(&json!({
+                    "type": "change",
+                    "running": running.to_string(),
+                    "future": future.iter().map(|(commit_hash, commit_msg, status)| json!({
+                        "commitHash": commit_hash.to_string(),
+                        "commitMsg": commit_msg,
+                        "status": status,
+                    })).collect_vec(),
+                    "selfFuture": self_future.iter().map(|(commit_hash, commit_msg, status)| json!({
+                        "commitHash": commit_hash.to_string(),
+                        "commitMsg": commit_msg,
+                        "status": status,
+                    })).collect_vec(),
+                })).unwrap());
+                loop {
+                    select! {
+                        () = sleep(Duration::from_secs(30)) => {
+                            yield rocket_ws::Message::Text(serde_json::to_string(&json!({
+                                "type": "ping",
+                            })).unwrap());
+                        }
+                        res = watch.changed() => {
+                            if res.is_err() { break }
+                            let status = supervisor.status().await;
+                            let mut payload = collect![as HashMap<_, _>: format!("type") => json!("change")];
+                            if status.running != running {
+                                payload.insert(format!("running"), json!(status.running.to_string()));
+                                running = status.running;
+                            }
+                            if status.future != future {
+                                payload.insert(format!("future"), json!(status.future.iter().map(|(commit_hash, commit_msg, status)| json!({
+                                    "commitHash": commit_hash.to_string(),
+                                    "commitMsg": commit_msg,
+                                    "status": status,
+                                })).collect_vec()));
+                                future = status.future.clone();
+                            }
+                            if status.self_future != self_future {
+                                payload.insert(format!("selfFuture"), json!(status.self_future.iter().map(|(commit_hash, commit_msg, status)| json!({
+                                    "commitHash": commit_hash.to_string(),
+                                    "commitMsg": commit_msg,
+                                    "status": status,
+                                })).collect_vec()));
+                                self_future = status.self_future.clone();
+                            }
+                            yield rocket_ws::Message::Text(serde_json::to_string(&payload).unwrap());
+                        }
+                        () = &mut shutdown => {
+                            yield rocket_ws::Message::Text(serde_json::to_string(&json!({
+                                "type": "refresh",
+                            })).unwrap());
+                            break
+                        }
                     }
-                    if status.future != future {
-                        payload.insert(format!("future"), json!(status.future.iter().map(|(commit_hash, commit_msg, status)| json!({
-                            "commitHash": commit_hash.to_string(),
-                            "commitMsg": commit_msg,
-                            "status": status,
-                        })).collect_vec()));
-                        future = status.future.clone();
-                    }
-                    if status.self_future != self_future {
-                        payload.insert(format!("selfFuture"), json!(status.self_future.iter().map(|(commit_hash, commit_msg, status)| json!({
-                            "commitHash": commit_hash.to_string(),
-                            "commitMsg": commit_msg,
-                            "status": status,
-                        })).collect_vec()));
-                        self_future = status.self_future.clone();
-                    }
-                    yield rocket_ws::Message::Text(serde_json::to_string(&payload).unwrap());
-                }
-                () = &mut shutdown => {
-                    yield rocket_ws::Message::Text(serde_json::to_string(&json!({
-                        "type": "refresh",
-                    })).unwrap());
-                    break
                 }
             }
-        }
+        }),
+        Outcome::Error(never) => match never {},
+        Outcome::Forward(status) => Either::Right((status, html! {
+            : Doctype;
+            html {
+                head {
+                    meta(charset = "utf-8");
+                    title : "Bad Request — Mido's House Status";
+                    meta(name = "viewport", content = "width=device-width, initial-scale=1, shrink-to-fit=no");
+                    link(rel = "icon", href = uri!(lens));
+                    style : RawHtml(include_str!("../assets/common.css"));
+                }
+                body {
+                    h1 : "Error 400: Bad Request";
+                    p {
+                        : "This API endpoint requires a ";
+                        a(href = "https://en.wikipedia.org/wiki/WebSocket") : "WebSocket";
+                        : " client.";
+                    }
+                    footer {
+                        p {
+                            : "hosted by ";
+                            a(href = "https://midos.house/user/14571800683221815449") : "Fenhl";
+                            : " • ";
+                            a(href = "https://fenhl.net/disc") : "disclaimer";
+                            : " • ";
+                            a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
+                        }
+                        p {
+                            : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                            a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
+                            : " for the Lens of Truth icon!";
+                        }
+                    }
+                }
+            }
+        })),
     }
 }
 
