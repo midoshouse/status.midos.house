@@ -20,32 +20,32 @@ warnings = "deny"
 
 [dependencies]
 async-proto = "0.26"
-base64 = "0.22.1"
+base64 = "0.22"
 chrono = { version = "0.4", default-features = false }
-chrono-tz = "0.10.4"
-clap = { version = "4.5.41", features = ["derive"] }
-collect-mac = "0.1.0"
-derivative = "2.2.0"
+chrono-tz = "0.10"
+clap = { version = "4", features = ["derive"] }
+collect-mac = "0.1"
+derivative = "2"
 dir-lock = "0.5"
-directories = "6.0.0"
-futures = "0.3.31"
+directories = "6"
+futures = "0.3"
 gix = "0.78"
-hmac = "0.12.1"
+hmac = "0.12"
 itermore = { version = "0.8", features = ["array_chunks"] }
-itertools = "0.14.0"
-lazy-regex = "3.4.1"
+itertools = "0.14"
+lazy-regex = "3"
 log-lock = { git = "https://github.com/fenhl/log-lock" }
-mimalloc = "0.1.46"
-rocket = { version = "0.5.1", features = ["secrets"] }
+mimalloc = "0.1"
+rocket = { version = "0.5", features = ["secrets"] }
 rocket-util = { git = "https://github.com/fenhl/rocket-util" }
-rocket_ws = "0.1.1"
-serde = { version = "1.0.219", features = ["derive"] }
+rocket_ws = "0.1"
+serde = { version = "1", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
-sha2 = "0.10.8"
-sqlx = { version = "0.8.6", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio", "tls-rustls-ring-webpki"] }
-thiserror = "2.0.12"
-tokio = { version = "1.44.2", features = ["net", "process", "sync", "time"] }
-url = "2.5.4"
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio", "tls-rustls-ring-webpki"] }
+thiserror = "2"
+tokio = { version = "1", features = ["net", "process", "sync", "time"] }
+url = "2"
 wheel = { git = "https://github.com/fenhl/wheel", features = ["rocket", "serde_json"] }
 which = "8"
 
@@ -54,4 +54,4 @@ xdg = "3"
 
 [build-dependencies]
 gix = "0.78"
-itertools = "0.14.0"
+itertools = "0.14"

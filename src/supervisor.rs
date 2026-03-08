@@ -347,6 +347,7 @@ impl Supervisor {
                             }
                         });
                         build_task = if needs_rebuild {
+                            println!("supervisor: needs rebuild");
                             needs_rebuild = false;
                             this.build_task(&user_dirs, &next_path).await
                         } else {
@@ -355,6 +356,8 @@ impl Supervisor {
                                 shutdown.notify();
                                 println!("supervisor: exiting for self-restart");
                                 break
+                            } else {
+                                println!("supervisor: no rebuild or restart needed");
                             }
                             None
                         };
