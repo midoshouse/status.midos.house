@@ -314,10 +314,14 @@ impl Supervisor {
                     Some(repo_name) = webhook_rx.recv() => match repo_name {
                         RepoName::MidosHouse => if this.fetch_mh().await? {
                             if build_task.is_some() {
+                                println!("supervisor: got webhook for mh, rebuild queued");
                                 needs_rebuild = true;
                             } else {
+                                println!("supervisor: got webhook for mh, starting build");
                                 build_task = this.build_task(&user_dirs, &next_path).await;
                             }
+                        } else {
+                            println!("supervisor: got webhook for mh but no change");
                         },
                         RepoName::Status => if this.fetch_self().await? {
                             if self_build_task.is_some() {
