@@ -222,7 +222,7 @@ impl Supervisor {
                             future.push((parent.detach(), iter_commit.message()?.summary().to_string()));
                         }
                     }
-                    let built_idx = future.binary_search_by_key(&built_commit, |(commit_hash, _)| *commit_hash).ok();
+                    let built_idx = future.iter().position(|(commit_hash, _)| *commit_hash == built_commit);
                     future.into_iter().enumerate().rev().map(|(idx, (commit_hash, commit_msg))| (commit_hash, commit_msg, if let Some(built_idx) = built_idx {
                         match idx.cmp(&built_idx) {
                             Less => CommitStatus::Pending,
@@ -336,7 +336,7 @@ impl Supervisor {
                         println!("supervisor: build finished");
                         lock!(@write status = this.status; {
                             let _ = status.watch.send(());
-                            if let Ok(built_idx) = status.future.binary_search_by_key(&built_commit, |(commit_hash, _, _)| *commit_hash) {
+                            if let Some(built_idx) = status.future.iter().position(|(commit_hash, _, _)| *commit_hash == built_commit) {
                                 let prepare_stop_status = status.future.iter()
                                     .find(|(_, _, status)| status.is_prepare_stop())
                                     .map(|(_, _, status)| status.clone())
@@ -391,7 +391,7 @@ impl Supervisor {
                         let built_commit = res??;
                         lock!(@write status = this.status; {
                             let _ = status.watch.send(());
-                            if let Ok(built_idx) = status.self_future.binary_search_by_key(&built_commit, |(commit_hash, _, _)| *commit_hash) {
+                            if let Some(built_idx) = status.self_future.iter().position(|(commit_hash, _, _)| *commit_hash == built_commit) {
                                 for (idx, (_, _, status)) in status.self_future.iter_mut().enumerate() {
                                     *status = match idx.cmp(&built_idx) {
                                         Less => SelfCommitStatus::Bundled,
