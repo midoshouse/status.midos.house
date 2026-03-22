@@ -51,7 +51,7 @@ sqlx = { version = "0.8", default-features = false, features = ["chrono", "macro
 thiserror = "2"
 tokio = { version = "1", features = ["net", "process", "sync", "time"] }
 url = "2"
-wheel = { git = "https://github.com/fenhl/wheel", features = ["rocket", "serde_json"] }
+wheel = { git = "https://github.com/fenhl/wheel", features = ["night", "rocket", "serde_json"] }
 which = "8"
 
 [target."cfg(unix)".dependencies]
