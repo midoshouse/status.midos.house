@@ -20,7 +20,7 @@ unused_qualifications = "deny"
 warnings = "deny"
 
 [build-dependencies]
-gix = "0.80"
+gix = "0.81"
 itertools = "0.14"
 
 [dependencies]
@@ -34,24 +34,24 @@ derivative = "2"
 dir-lock = "0.5"
 directories = "6"
 futures = "0.3"
-gix = "0.80"
-hmac = "0.12"
+gix = "0.81"
+hmac = "0.13"
 itermore = { version = "0.8", features = ["array_chunks"] }
 itertools = "0.14"
 lazy-regex = "3"
 log-lock = { git = "https://github.com/fenhl/log-lock" }
 mimalloc = "0.1"
-rocket = { version = "0.5", features = ["secrets"] }
-rocket-util = { git = "https://github.com/fenhl/rocket-util" }
-rocket_ws = "0.1"
+rocket = { git = "https://github.com/fenhl/Rocket", branch = "forms", features = ["secrets"] }
+rocket-util = { git = "https://github.com/fenhl/rocket-util", branch = "forms" }
+rocket_ws = { git = "https://github.com/fenhl/Rocket", branch = "forms" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
-sha2 = "0.10"
+sha2 = "0.11"
 sqlx = { version = "0.8", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio", "tls-rustls-ring-webpki"] }
 thiserror = "2"
 tokio = { version = "1", features = ["net", "process", "sync", "time"] }
 url = "2"
-wheel = { git = "https://github.com/fenhl/wheel", features = ["night", "rocket", "serde_json"] }
+wheel = { git = "https://github.com/fenhl/wheel", branch = "rocket-forms", features = ["night", "rocket", "serde_json"] }
 which = "8"
 
 [target."cfg(unix)".dependencies]

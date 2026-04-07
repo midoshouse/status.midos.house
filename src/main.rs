@@ -17,12 +17,15 @@ use {
     futures::future::FutureExt as _,
     hmac::{
         Hmac,
+        KeyInit as _,
         Mac as _,
     },
     itermore::IterArrayChunks as _,
-    itertools::Itertools as _,
-    rocket::{
+    itertools::{
         Either,
+        Itertools as _,
+    },
+    rocket::{
         Rocket,
         State,
         async_trait,
@@ -695,12 +698,11 @@ async fn main(Args { subcommand }: Args) -> Result<(), Error> {
                 .application_name("mhstatus")
             ).await?;
         let (supervisor, run_supervisor) = Supervisor::new().await?;
-        let rocket = rocket::custom(rocket::Config {
+        let rocket = rocket::custom(rocket::Config::figment().merge(rocket::Config {
             secret_key: SecretKey::from(&BASE64.decode(&config.secret_key)?),
-            log_level: rocket::config::LogLevel::Critical,
-            port: 24824,
+            log_level: Some(rocket::config::Level::ERROR),
             ..rocket::Config::default()
-        })
+        }).merge(("port", 24824))) //TODO report issue for lack of typed interface to set port, see https://github.com/rwf2/Rocket/commit/fd294049c784cb52680a423616fadc29d57fa25b
         .mount("/", rocket::routes![
             index,
             websocket,
