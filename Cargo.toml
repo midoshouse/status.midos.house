@@ -20,7 +20,7 @@ unused_qualifications = "deny"
 warnings = "deny"
 
 [build-dependencies]
-gix = "0.81"
+gix = "0.83"
 itertools = "0.14"
 
 [dependencies]
@@ -34,7 +34,7 @@ derivative = "2"
 dir-lock = "0.5"
 directories = "6"
 futures = "0.3"
-gix = "0.81"
+gix = "0.83"
 hmac = "0.13"
 itermore = { version = "0.8", features = ["array_chunks"] }
 itertools = "0.14"
