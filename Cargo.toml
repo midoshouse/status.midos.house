@@ -42,7 +42,7 @@ lazy-regex = "3"
 log-lock = { git = "https://github.com/fenhl/log-lock" }
 mimalloc = "0.1"
 rocket = { git = "https://github.com/fenhl/Rocket", branch = "forms", features = ["secrets"] }
-rocket-util = { git = "https://github.com/fenhl/rocket-util", branch = "forms" }
+rocket-util = { git = "https://github.com/fenhl/rocket-util" }
 rocket_ws = { git = "https://github.com/fenhl/Rocket", branch = "forms" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
@@ -51,7 +51,7 @@ sqlx = { version = "0.8", default-features = false, features = ["chrono", "macro
 thiserror = "2"
 tokio = { version = "1", features = ["net", "process", "sync", "time"] }
 url = "2"
-wheel = { git = "https://github.com/fenhl/wheel", branch = "rocket-forms", features = ["night", "rocket", "serde_json"] }
+wheel = { git = "https://github.com/fenhl/wheel", features = ["night", "rocket", "serde_json"] }
 which = "8"
 
 [target."cfg(unix)".dependencies]
