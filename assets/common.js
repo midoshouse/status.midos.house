@@ -134,11 +134,11 @@ function startWebsocket() {
         sock.onerror = (event) => {
             console.log(`WebSocket error: ${event}`);
             throw event;
-        }
+        };
         sock.onclose = () => {
             setState('Connection for automatic status updates lost, reconnecting…');
             setTimeout(startWebsocket, 1000);
-        }
+        };
     } catch (e) {
         setState(`Error checking for status updates: ${e}. Please report this error to Fenhl.`);
     }

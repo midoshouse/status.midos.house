@@ -506,7 +506,7 @@ impl Supervisor {
     }
 
     pub(crate) async fn status(&self) -> tokio::sync::RwLockReadGuard<'_, Status> {
-        self.status.0.read().await
+        self.status.inner.read().await
     }
 
     async fn fetch_mh(&self) -> Result<bool, Error> {

@@ -2,7 +2,7 @@
 name = "mhstatus"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.91" # nixpkgs stable
+rust-version = "1.95" # nixpkgs stable
 
 [profile.release]
 codegen-units = 1
@@ -20,8 +20,8 @@ unused_qualifications = "deny"
 warnings = "deny"
 
 [build-dependencies]
-gix = "0.83"
-itertools = "0.14"
+gix = "0.85"
+itertools = "0.15"
 
 [dependencies]
 async-proto = "0.26"
@@ -34,10 +34,10 @@ derivative = "2"
 dir-lock = "0.5"
 directories = "6"
 futures = "0.3"
-gix = "0.83"
+gix = "0.85"
 hmac = "0.13"
 itermore = { version = "0.8", features = ["array_chunks"] }
-itertools = "0.14"
+itertools = "0.15"
 lazy-regex = "3"
 log-lock = { git = "https://github.com/fenhl/log-lock" }
 mimalloc = "0.1"
