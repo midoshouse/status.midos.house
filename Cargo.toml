@@ -20,12 +20,12 @@ unused_qualifications = "deny"
 warnings = "deny"
 
 [build-dependencies]
-gix = "0.85"
+gix = "0.86"
 itertools = "0.15"
 
 [dependencies]
 async-proto = "0.26"
-base64 = "0.22"
+base64 = "0.23"
 chrono = { version = "0.4", default-features = false }
 chrono-tz = "0.10"
 clap = { version = "4", features = ["derive"] }
@@ -34,7 +34,7 @@ derivative = "2"
 dir-lock = "0.5"
 directories = "6"
 futures = "0.3"
-gix = "0.85"
+gix = "0.86"
 hmac = "0.13"
 itermore = { version = "0.8", features = ["array_chunks"] }
 itertools = "0.15"
