@@ -20,7 +20,7 @@ unused_qualifications = "deny"
 warnings = "deny"
 
 [build-dependencies]
-gix = "0.86"
+gix = "0.87"
 itertools = "0.15"
 
 [dependencies]
@@ -34,7 +34,7 @@ derivative = "2"
 dir-lock = "0.5"
 directories = "6"
 futures = "0.3"
-gix = "0.86"
+gix = "0.87"
 hmac = "0.13"
 itermore = { version = "0.8", features = ["array_chunks"] }
 itertools = "0.15"
@@ -47,7 +47,7 @@ rocket_ws = { git = "https://github.com/fenhl/Rocket", branch = "forms" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
 sha2 = "0.11"
-sqlx = { version = "0.8", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio", "tls-rustls-ring-webpki"] }
+sqlx = { version = "0.9", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio", "tls-rustls"] }
 thiserror = "2"
 tokio = { version = "1", features = ["net", "process", "sync", "time"] }
 url = "2"
