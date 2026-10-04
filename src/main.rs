@@ -304,7 +304,9 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
                         a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
                     }
                     p {
-                        : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                        : "Special thanks to ";
+                        a(href = "https://midos.house/user/9965798505670301459") : "Maplestar";
+                        : " for some of the chest icons used in the logos, and to ";
                         a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
                         : " for the Lens of Truth icon!";
                     }
@@ -412,7 +414,9 @@ async fn websocket(supervisor: &State<Supervisor>, ws: request::Outcome<WebSocke
                             a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
                         }
                         p {
-                            : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                            : "Special thanks to ";
+                            a(href = "https://midos.house/user/9965798505670301459") : "Maplestar";
+                            : " for some of the chest icons used in the logos, and to ";
                             a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
                             : " for the Lens of Truth icon!";
                         }
@@ -557,7 +561,9 @@ fn not_found() -> RawHtml<String> {
                         a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
                     }
                     p {
-                        : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                        : "Special thanks to ";
+                        a(href = "https://midos.house/user/9965798505670301459") : "Maplestar";
+                        : " for some of the chest icons used in the logos, and to ";
                         a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
                         : " for the Lens of Truth icon!";
                     }
@@ -593,7 +599,9 @@ async fn internal_server_error() -> wheel::Result<RawHtml<String>> {
                         a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
                     }
                     p {
-                        : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                        : "Special thanks to ";
+                        a(href = "https://midos.house/user/9965798505670301459") : "Maplestar";
+                        : " for some of the chest icons used in the logos, and to ";
                         a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
                         : " for the Lens of Truth icon!";
                     }
@@ -637,7 +645,9 @@ async fn fallback_catcher(status: Status, _: &Request<'_>) -> wheel::Result<RawH
                         a(href = "https://github.com/midoshouse/status.midos.house") : "source code";
                     }
                     p {
-                        : "Special thanks to Maplestar for some of the chest icons used in the logos, and to ";
+                        : "Special thanks to ";
+                        a(href = "https://midos.house/user/9965798505670301459") : "Maplestar";
+                        : " for some of the chest icons used in the logos, and to ";
                         a(href = "https://midos.house/user/17762941071474623984") : "Xopar";
                         : " for the Lens of Truth icon!";
                     }
