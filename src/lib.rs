@@ -31,14 +31,13 @@ pub enum EventKind {
 
 #[derive(Derivative, Clone, Protocol, Serialize)]
 #[derivative(PartialEq, Eq, Hash)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum OpenRoom {
     #[serde(skip)]
     Discord {
         id: RaceId,
         kind: EventKind,
     },
-    #[serde(rename_all = "camelCase")]
     RaceTime {
         room_url: String,
         #[derivative(PartialEq = "ignore", Hash = "ignore")]
@@ -109,7 +108,8 @@ pub struct SubsystemStatusUpdate {
     pub status: SubsystemStatusKind,
 }
 
-#[derive(Debug, Clone, Copy, Protocol)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Protocol, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum SubsystemStatusKind {
     Operational,
     NetworkError {

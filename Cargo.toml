@@ -26,7 +26,7 @@ itertools = "0.15"
 [dependencies]
 async-proto = { version = "0.26", features = ["chrono"] }
 base64 = "0.23"
-chrono = { version = "0.4", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["serde"] }
 chrono-tz = "0.10"
 clap = { version = "4", features = ["derive"] }
 collect-mac = "0.1"
