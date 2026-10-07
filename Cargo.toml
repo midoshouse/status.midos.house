@@ -24,7 +24,7 @@ gix = "0.87"
 itertools = "0.15"
 
 [dependencies]
-async-proto = "0.26"
+async-proto = { version = "0.26", features = ["chrono"] }
 base64 = "0.23"
 chrono = { version = "0.4", default-features = false }
 chrono-tz = "0.10"

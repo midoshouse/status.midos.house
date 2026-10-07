@@ -152,6 +152,7 @@ checksum = "269d2063968856c8cade5cc190c74a826ea9d3239e4c73387c248bd52fbd41bd"
 dependencies = [
  "async-proto-derive",
  "byteorder",
+ "chrono",
  "fallible_collections",
  "thiserror 2.0.20",
  "tokio",

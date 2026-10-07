@@ -6,6 +6,7 @@ use {
         fmt,
     },
     async_proto::Protocol,
+    chrono::prelude::*,
     derivative::Derivative,
     serde::Serialize,
     url::Url,
@@ -100,4 +101,19 @@ impl fmt::Display for PrepareStopUpdate {
             Self::RoomClosed(room) => write!(f, "room closed: {}", room.to_string("racetime.gg")),
         }
     }
+}
+
+#[derive(Protocol)]
+pub struct SubsystemStatusUpdate {
+    pub subsystem: String,
+    pub status: SubsystemStatusKind,
+}
+
+#[derive(Protocol)]
+pub enum SubsystemStatusKind {
+    Operational,
+    NetworkError {
+        retry_at: DateTime<Utc>,
+    },
+    Crashed,
 }
