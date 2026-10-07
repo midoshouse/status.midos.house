@@ -103,13 +103,13 @@ impl fmt::Display for PrepareStopUpdate {
     }
 }
 
-#[derive(Protocol)]
+#[derive(Debug, Clone, Protocol)]
 pub struct SubsystemStatusUpdate {
     pub subsystem: String,
     pub status: SubsystemStatusKind,
 }
 
-#[derive(Protocol)]
+#[derive(Debug, Clone, Copy, Protocol)]
 pub enum SubsystemStatusKind {
     Operational,
     NetworkError {
