@@ -102,8 +102,7 @@ const TRACKER_REPO_PATH: &str = "/opt/git/github.com/fenhl/oottracker/branch/mw"
 
 #[derive(Debug, thiserror::Error, rocket_util::Error)]
 enum IndexError {
-    #[error(transparent)] GitHeadCommit(#[from] gix::reference::head_commit::Error),
-    #[error(transparent)] GitOpen(#[from] gix::open::Error),
+    #[error(transparent)] Git(#[from] gix::Error),
     #[error(transparent)] Sql(#[from] sqlx::Error),
 }
 
