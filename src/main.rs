@@ -70,6 +70,7 @@ use {
     },
     url as _, // only used in lib
     wheel::traits::IoResultExt as _,
+    mhstatus::SubsystemStatusKind,
     crate::{
         config::Config,
         supervisor::{
@@ -108,7 +109,7 @@ enum IndexError {
 
 #[rocket::get("/")]
 async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Result<RawHtml<String>, IndexError> {
-    let supervisor::Status { watch: _, ref running, ref future, ref self_future } = *supervisor.status().await;
+    let supervisor::Status { watch: _, ref running, ref future, ref subsystems, ref self_future } = *supervisor.status().await;
     Ok(html! {
         : Doctype;
         html {
@@ -194,6 +195,30 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
                                             CommitStatus::Deploy => : "deploying";
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+                p : "Subsystem status:";
+                table {
+                    thead {
+                        tr {
+                            th : "Subsystem";
+                            th : "Status";
+                        }
+                    }
+                    tbody(id = "mh-subsystems-tbody") {
+                        @for (subsystem, status) in subsystems {
+                            tr {
+                                td : subsystem;
+                                @match status {
+                                    SubsystemStatusKind::Operational => td : "working";
+                                    SubsystemStatusKind::NetworkError { retry_at } => td(class = "warning") {
+                                        : "network error, retrying ";
+                                        : format_datetime(*retry_at, DateTimeFormat { long: false, running_text: true });
+                                    }
+                                    SubsystemStatusKind::Crashed => td(class = "error") : "error";
                                 }
                             }
                         }
@@ -320,9 +345,9 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
 async fn websocket(supervisor: &State<Supervisor>, ws: request::Outcome<WebSocket, Never>, mut shutdown: rocket::Shutdown) -> Either<rocket_ws::Stream![], (Status, RawHtml<String>)> {
     match ws {
         Outcome::Success(ws) => Either::Left({
-            let (mut running, mut future, mut self_future, mut watch) = {
+            let (mut running, mut future, mut subsystems, mut self_future, mut watch) = {
                 let status = supervisor.status().await;
-                (status.running.clone(), status.future.clone(), status.self_future.clone(), status.watch.subscribe())
+                (status.running.clone(), status.future.clone(), status.subsystems.clone(), status.self_future.clone(), status.watch.subscribe())
             };
             let supervisor = (**supervisor).clone();
             rocket_ws::Stream! { ws =>
@@ -336,6 +361,7 @@ async fn websocket(supervisor: &State<Supervisor>, ws: request::Outcome<WebSocke
                         "commitMsg": commit_msg,
                         "status": status,
                     })).collect_vec(),
+                    "subsystems": subsystems,
                     "selfFuture": self_future.iter().map(|(commit_hash, commit_msg, status)| json!({
                         "commitHash": commit_hash.to_string(),
                         "commitMsg": commit_msg,
@@ -364,6 +390,10 @@ async fn websocket(supervisor: &State<Supervisor>, ws: request::Outcome<WebSocke
                                     "status": status,
                                 })).collect_vec()));
                                 future = status.future.clone();
+                            }
+                            if status.subsystems != subsystems {
+                                payload.insert(format!("subsystems"), json!(status.subsystems));
+                                subsystems = status.subsystems.clone();
                             }
                             if status.self_future != self_future {
                                 payload.insert(format!("selfFuture"), json!(status.self_future.iter().map(|(commit_hash, commit_msg, status)| json!({

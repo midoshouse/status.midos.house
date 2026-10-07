@@ -85,6 +85,39 @@ function startWebsocket() {
                             document.getElementById('mh-future-tbody').replaceChildren(...futureChildren);
                         }
                     }
+                    if ('subsystems' in payload) {
+                        const subsystemsChildren = payload.subsystems
+                            .map((subsystem) => {
+                                const row = document.createElement('tr');
+                                const nameCell = document.createElement('td');
+                                nameCell.appendChild(document.createTextNode(subsystem.name));
+                                row.appendChild(nameCell);
+                                const statusCell = document.createElement('td');
+                                switch (subsystem.status.type) {
+                                    case 'operational': {
+                                        statusCell.appendChild(document.createTextNode('working'));
+                                        break;
+                                    }
+                                    case 'networkError': {
+                                        statusCell.setAttribute('class', 'warning');
+                                        const retryAt = new Date(subsystem.status.retryAt).toLocaleString([], {
+                                            dateStyle: 'medium',
+                                            timeStyle: 'short',
+                                        });
+                                        statusCell.appendChild(document.createTextNode(`network error, retrying ${retryAt}`));
+                                        break;
+                                    }
+                                    case 'crashed': {
+                                        statusCell.setAttribute('class', 'error');
+                                        statusCell.appendChild(document.createTextNode('error'));
+                                        break;
+                                    }
+                                }
+                                row.appendChild(statusCell);
+                                return row;
+                            });
+                        document.getElementById('mh-subsystems-tbody').replaceChildren(...subsystemsChildren);
+                    }
                     if ('selfFuture' in payload) {
                         if (payload.selfFuture.length == 0) {
                             document.getElementById('self-future-empty').removeAttribute('style');

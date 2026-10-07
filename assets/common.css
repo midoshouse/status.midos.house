@@ -6,9 +6,21 @@ body {
     border: 1px solid #909000;
 }
 
-p.warning {
+p.warning,
+td.warning {
     background-color: #ffff90;
+}
+
+p.warning {
     padding: 8px;
+}
+
+.error {
+    border: 1px solid #c00000;
+}
+
+td.error {
+    background-color: #ffc0c0;
 }
 
 .header {
@@ -120,8 +132,17 @@ footer {
         border-color: #ffff00;
     }
 
-    p.warning {
+    p.warning,
+    td.warning {
         background-color: #404000;
+    }
+
+    .error {
+        border-color: #ff4040;
+    }
+
+    td.error {
+        background-color: #400000;
     }
 
     tbody > tr:hover {

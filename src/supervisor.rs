@@ -3,6 +3,7 @@ use {
         borrow::Cow,
         cmp::Ordering::*,
         collections::{
+            HashMap,
             HashSet,
             VecDeque,
         },
@@ -59,12 +60,15 @@ use {
             CommandExt as _,
             IoResultExt as _,
             SendResultExt as _,
+            SyncCommandOutputExt as _,
         },
     },
     which::which,
     mhstatus::{
         OpenRoom,
         PrepareStopUpdate,
+        SubsystemStatusKind,
+        SubsystemStatusUpdate,
     },
     crate::GIT_COMMIT_HASH,
 };
@@ -96,6 +100,7 @@ pub(crate) struct Status {
     pub(crate) watch: watch::Sender<()>,
     pub(crate) running: gix::ObjectId,
     pub(crate) future: Vec<(gix::ObjectId, String, CommitStatus)>,
+    pub(crate) subsystems: HashMap<String, SubsystemStatusKind>,
     pub(crate) self_future: Vec<(gix::ObjectId, String, SelfCommitStatus)>,
 }
 
@@ -226,6 +231,7 @@ impl Supervisor {
                         CommitStatus::Pending
                     })).collect()
                 },
+                subsystems: HashMap::default(),
                 self_future: {
                     let mut self_future = Vec::default();
                     Command::new("git").arg("fetch").current_dir(SELF_REPO_PATH).check("git fetch").await?; //TODO use GitHub API or gix (how?)
@@ -262,6 +268,8 @@ impl Supervisor {
             let prepare_stop_read = PrepareStopUpdate::read_owned(child.stdout.take().expect("stdout was piped"));
             (Some(child), prepare_stop_read)
         };
+        let mut subsystem_status_child = Command::new(BIN_PATH).arg("follow-subsystem-status").arg("--async-proto").stdout(Stdio::piped()).spawn().at_command("midos-house follow-subsystem-status")?;
+        let mut subsystem_status_read = SubsystemStatusUpdate::read_owned(subsystem_status_child.stdout.take().expect("stdout was piped"));
         let mut needs_self_restart = false;
         #[cfg(unix)] { fs::remove_file(unix_socket::PATH).await.missing_ok()?; }
         let unix_listener = {
@@ -466,6 +474,29 @@ impl Supervisor {
                                 status.future.drain(..=idx);
                             }
                         });
+                    }
+                    res = &mut subsystem_status_read => match res {
+                        Ok((stdout, update)) => {
+                            subsystem_status_read = SubsystemStatusUpdate::read_owned(stdout);
+                            lock!(@write status = this.status; {
+                                let SubsystemStatusUpdate { subsystem, status: subsystem_status } = update;
+                                if status.subsystems.insert(subsystem, subsystem_status).is_none_or(|prev_status| prev_status != subsystem_status) {
+                                    let _ = status.watch.send(());
+                                };
+                            });
+                        }
+                        Err(ReadError { kind: ReadErrorKind::EndOfStream, .. }) => {
+                            subsystem_status_read = future::pending().boxed();
+                        }
+                        Err(ReadError { kind: ReadErrorKind::Io(e), .. }) if e.kind() == io::ErrorKind::UnexpectedEof => {
+                            subsystem_status_read = future::pending().boxed();
+                        }
+                        Err(e) => return Err(e.into()),
+                    },
+                    res = subsystem_status_child.wait() => {
+                        res.at_command("midos-house follow-subsystem-status")?.check("midos-house follow-subsystem-status")?;
+                        subsystem_status_child = Command::new(BIN_PATH).arg("follow-subsystem-status").arg("--async-proto").stdout(Stdio::piped()).spawn().at_command("midos-house follow-subsystem-status")?;
+                        subsystem_status_read = SubsystemStatusUpdate::read_owned(subsystem_status_child.stdout.take().expect("stdout was piped"));
                     }
                     res = unix_listener.accept() => {
                         let (sock, _) = res.at_unknown()?;
