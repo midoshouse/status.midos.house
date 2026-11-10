@@ -24,10 +24,8 @@ gix = "0.88"
 itertools = "0.15"
 
 [dependencies]
-async-proto = { version = "0.26", features = ["chrono"] }
+async-proto = { version = "0.26", features = ["jiff"] }
 base64 = "0.23"
-chrono = { version = "0.4", default-features = false, features = ["serde"] }
-chrono-tz = "0.10"
 clap = { version = "4", features = ["derive"] }
 collect-mac = "0.1"
 derivative = "2"
@@ -38,6 +36,8 @@ gix = "0.88"
 hmac = "0.13"
 itermore = { version = "0.8", features = ["array_chunks"] }
 itertools = "0.15"
+jiff = { version = "0.2", features = ["serde"] }
+jiff-sqlx = { version = "0.2.2", features = ["postgres"] }
 lazy-regex = "3"
 log-lock = { git = "https://github.com/fenhl/log-lock" }
 mimalloc = "0.1"
@@ -47,7 +47,7 @@ rocket_ws = { git = "https://github.com/fenhl/Rocket", branch = "forms" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
 sha2 = "0.11"
-sqlx = { version = "0.9", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio", "tls-rustls"] }
+sqlx = { version = "0.9", default-features = false, features = ["macros", "postgres", "runtime-tokio", "tls-rustls"] }
 thiserror = "2"
 tokio = { version = "1", features = ["net", "process", "sync", "time"] }
 url = "2"

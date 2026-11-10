@@ -11,7 +11,6 @@ use {
         Engine as _,
         general_purpose::STANDARD as BASE64,
     },
-    chrono::prelude::*,
     collect_mac::collect,
     derivative as _, // only used in lib
     futures::future::FutureExt as _,
@@ -125,9 +124,9 @@ async fn index(db_pool: &State<PgPool>, supervisor: &State<Supervisor>) -> Resul
                 @if let Some(row) = sqlx::query(r#"SELECT start, end_time FROM maintenance_windows WHERE kind = 'midos_house' AND start <= NOW() + INTERVAL '168:00:00' AND end_time > NOW() ORDER BY start LIMIT 1"#).fetch_optional(&**db_pool).await? { //TODO continuously check via WebSocket
                     p(class = "warning") {
                         : "Maintenance on the Mido's House server is scheduled from ";
-                        : format_datetime(row.get::<DateTime<Utc>, _>("start"), DateTimeFormat { long: true, running_text: true });
+                        : format_datetime(row.get::<jiff_sqlx::Timestamp, _>("start"), DateTimeFormat { long: true, running_text: true });
                         : " until ";
-                        : format_datetime(row.get::<DateTime<Utc>, _>("end_time"), DateTimeFormat { long: true, running_text: true });
+                        : format_datetime(row.get::<jiff_sqlx::Timestamp, _>("end_time"), DateTimeFormat { long: true, running_text: true });
                         : ". The services listed here (including this page) may go offline for a while during that time.";
                     }
                 }

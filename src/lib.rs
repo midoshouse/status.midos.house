@@ -6,8 +6,8 @@ use {
         fmt,
     },
     async_proto::Protocol,
-    chrono::prelude::*,
     derivative::Derivative,
+    jiff::Timestamp,
     serde::Serialize,
     url::Url,
 };
@@ -113,7 +113,7 @@ pub struct SubsystemStatusUpdate {
 pub enum SubsystemStatusKind {
     Operational,
     NetworkError {
-        retry_at: DateTime<Utc>,
+        retry_at: Timestamp,
     },
     Crashed,
 }
