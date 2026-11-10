@@ -87,20 +87,21 @@ function startWebsocket() {
                     }
                     if ('subsystems' in payload) {
                         const subsystemsChildren = payload.subsystems
-                            .map((subsystem) => {
+                            .entries()
+                            .map(([name, status]) => {
                                 const row = document.createElement('tr');
                                 const nameCell = document.createElement('td');
-                                nameCell.appendChild(document.createTextNode(subsystem.name));
+                                nameCell.appendChild(document.createTextNode(name));
                                 row.appendChild(nameCell);
                                 const statusCell = document.createElement('td');
-                                switch (subsystem.status.type) {
+                                switch (status.type) {
                                     case 'operational': {
                                         statusCell.appendChild(document.createTextNode('working'));
                                         break;
                                     }
                                     case 'networkError': {
                                         statusCell.setAttribute('class', 'warning');
-                                        const retryAt = new Date(subsystem.status.retryAt).toLocaleString([], {
+                                        const retryAt = new Date(status.retryAt).toLocaleString([], {
                                             dateStyle: 'medium',
                                             timeStyle: 'short',
                                         });
