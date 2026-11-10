@@ -86,8 +86,7 @@ function startWebsocket() {
                         }
                     }
                     if ('subsystems' in payload) {
-                        const subsystemsChildren = payload.subsystems
-                            .entries()
+                        const subsystemsChildren = Object.entries(payload.subsystems)
                             .map(([name, status]) => {
                                 const row = document.createElement('tr');
                                 const nameCell = document.createElement('td');
